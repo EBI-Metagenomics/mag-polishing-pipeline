@@ -1,0 +1,1 @@
+../pipelines/genomes-generation/bin/ggp_binlinks.py

@@ -1,0 +1,1 @@
+../pipelines/genomes-generation/bin/propagate_taxonomy_to_bins.py

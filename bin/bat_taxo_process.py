@@ -1,0 +1,1 @@
+../pipelines/genomes-generation/bin/bat_taxo_process.py
