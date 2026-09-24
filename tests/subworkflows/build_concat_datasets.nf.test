@@ -1,0 +1,105 @@
+nextflow_workflow {
+
+    name "BUILD_CONCAT_DATASETS"
+    script "../../subworkflows/local/build_concat_datasets/main.nf"
+    workflow "BUILD_CONCAT_DATASETS"
+
+    // Branchwater -> ENA -> one co-assembly dataset per --n_concat_samples value.
+    // The whole chain runs on stubs, so what is under test is our wiring: that one
+    // dataset comes out per requested depth, and that each carries the sample's own
+    // reads plus exactly N public runs.
+
+    def FIXTURES = "\${projectDir}/tests/subworkflows/fixtures/build_concat_datasets"
+
+    test("one dataset per requested co-assembly depth") {
+        options "-stub"
+        when {
+            params {
+                branchwater_index       = "${projectDir}"
+                branchwater_metadata_db = "${projectDir}/nextflow.config"
+                n_concat_samples        = "1,5,10"
+                ena_cache_dir           = "${outputDir}/cache"
+            }
+            workflow {
+                """
+                input[0] = channel.of([
+                    [id: "SAMPLE_001_concoct_1", sample: "SAMPLE_001"],
+                    file("${FIXTURES}/SAMPLE_001_concoct_1.fa")
+                ])
+                input[1] = channel.of([
+                    "SAMPLE_001",
+                    [ file("${FIXTURES}/SAMPLE_001_1.fastq.gz"),
+                      file("${FIXTURES}/SAMPLE_001_2.fastq.gz") ]
+                ])
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            def ids = workflow.out.reads.collect { it[0].id }.sort()
+            assert ids == ["SAMPLE_001_n1", "SAMPLE_001_n10", "SAMPLE_001_n5"]
+        }
+    }
+
+    test("each dataset carries the sample plus exactly n public runs") {
+        options "-stub"
+        when {
+            params {
+                branchwater_index       = "${projectDir}"
+                branchwater_metadata_db = "${projectDir}/nextflow.config"
+                n_concat_samples        = "1,5,10"
+                ena_cache_dir           = "${outputDir}/cache"
+            }
+            workflow {
+                """
+                input[0] = channel.of([
+                    [id: "SAMPLE_001_concoct_1", sample: "SAMPLE_001"],
+                    file("${FIXTURES}/SAMPLE_001_concoct_1.fa")
+                ])
+                input[1] = channel.of([
+                    "SAMPLE_001",
+                    [ file("${FIXTURES}/SAMPLE_001_1.fastq.gz"),
+                      file("${FIXTURES}/SAMPLE_001_2.fastq.gz") ]
+                ])
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            workflow.out.reads.each { meta, reads ->
+                assert reads.size() == 2, "a co-assembly dataset is still paired end"
+                assert meta.sources.size() == meta.n_concat + 1, meta.sources
+                assert meta.sources.first() == "SAMPLE_001"
+            }
+        }
+    }
+
+    test("a single requested depth builds a single dataset") {
+        options "-stub"
+        when {
+            params {
+                branchwater_index       = "${projectDir}"
+                branchwater_metadata_db = "${projectDir}/nextflow.config"
+                n_concat_samples        = "1"
+                ena_cache_dir           = "${outputDir}/cache"
+            }
+            workflow {
+                """
+                input[0] = channel.of([
+                    [id: "SAMPLE_001_concoct_1", sample: "SAMPLE_001"],
+                    file("${FIXTURES}/SAMPLE_001_concoct_1.fa")
+                ])
+                input[1] = channel.of([
+                    "SAMPLE_001",
+                    [ file("${FIXTURES}/SAMPLE_001_1.fastq.gz"),
+                      file("${FIXTURES}/SAMPLE_001_2.fastq.gz") ]
+                ])
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.out.reads.collect { it[0].id } == ["SAMPLE_001_n1"]
+        }
+    }
+}

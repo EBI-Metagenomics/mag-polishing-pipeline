@@ -1,0 +1,44 @@
+nextflow_process {
+
+    name "GUNZIP_GENOME"
+    script "../../modules/local/gunzip_genome/main.nf"
+    process "GUNZIP_GENOME"
+
+    // MAGs leave GGP as .fa.gz and reference genomes arrive either way. Both have to end
+    // up as `<meta.id>.fa`, because fasta.baseName is the key every downstream join uses.
+
+    def FIXTURES = "\${projectDir}/tests/modules/fixtures/gunzip_genome"
+
+    test("a gzipped genome is decompressed and renamed to meta.id") {
+        when {
+            process {
+                """
+                input[0] = [ [id: "SAMPLE_001"], file("${FIXTURES}/compressed.fna.gz") ]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def (meta, fasta) = process.out.genome[0]
+            assert meta.id == "SAMPLE_001"
+            assert fasta.endsWith("SAMPLE_001.fa")
+            assert path(fasta).text == ">contig_1\nACGTACGTAA\n"
+        }
+    }
+
+    test("an already plain genome is copied, not mangled") {
+        when {
+            process {
+                """
+                input[0] = [ [id: "SAMPLE_002"], file("${FIXTURES}/plain.fna") ]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def (meta, fasta) = process.out.genome[0]
+            assert fasta.endsWith("SAMPLE_002.fa")
+            assert path(fasta).text == ">contig_1\nACGTACGTAA\n"
+        }
+    }
+}

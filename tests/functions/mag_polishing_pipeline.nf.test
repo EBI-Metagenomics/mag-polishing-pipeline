@@ -1,0 +1,35 @@
+nextflow_function {
+
+    name "genome_name / owner_of"
+    script "../../workflows/mag_polishing_pipeline.nf"
+
+    test("genome_name strips the fasta extension") {
+        function "genome_name"
+        when { function { """ input[0] = file("x/SAMPLE_001.fna.gz") """ } }
+        then { assert function.success; assert function.result == "SAMPLE_001" }
+    }
+
+    test("genome_name keeps the binner suffix that identifies a bin") {
+        function "genome_name"
+        when { function { """ input[0] = file("x/SAMPLE_001_n5_concoct_3.fa.gz") """ } }
+        then { assert function.result == "SAMPLE_001_n5_concoct_3" }
+    }
+
+    test("owner_of prefers the longest match so SAMPLE_1 cannot steal SAMPLE_11's bin") {
+        function "owner_of"
+        when { function { """ input[0] = "SAMPLE_11_concoct_1.fa.gz"; input[1] = ["SAMPLE_1", "SAMPLE_11"] """ } }
+        then { assert function.success; assert function.result == "SAMPLE_11" }
+    }
+
+    test("owner_of attributes a cycle-2 bin to its dataset, not to the sample") {
+        function "owner_of"
+        when { function { """ input[0] = "SAMPLE_001_n5_metabat_2.fa.gz"; input[1] = ["SAMPLE_001", "SAMPLE_001_n5"] """ } }
+        then { assert function.result == "SAMPLE_001_n5" }
+    }
+
+    test("owner_of fails loudly on a bin it cannot attribute") {
+        function "owner_of"
+        when { function { """ input[0] = "MYSTERY_concoct_1.fa.gz"; input[1] = ["SAMPLE_001"] """ } }
+        then { assert function.failed }
+    }
+}
