@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+pythonpath = [".", "bin", "tests"]
+python_files = ["test_*.py"]
+testpaths = ["tests/scripts"]
+
+[tool.ruff]
+line-length = 110

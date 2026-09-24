@@ -1,0 +1,1 @@
+../pipelines/genomes-generation/bin/create_qc_table.py

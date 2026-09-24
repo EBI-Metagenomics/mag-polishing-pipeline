@@ -1,0 +1,1 @@
+../pipelines/miassembler/bin/calculate_assembly_coverage.py

@@ -1,0 +1,55 @@
+nextflow_workflow {
+
+    name "COMPARE"
+    script "../../subworkflows/local/compare/main.nf"
+    workflow "COMPARE"
+
+    // The deliverable. Every metric is keyed back to the genome basename, and each cell
+    // holds one value per genome, "/" separated, in the order the comparison set was
+    // built (reference -> cycle 1 -> ascending N).
+
+    def FIXTURES = "\${projectDir}/tests/subworkflows/fixtures/compare"
+
+    test("one row per sample, with the metrics joined by basename") {
+        options "-stub"
+        when {
+            params { busco_db = "${projectDir}"; busco_mode = "genome" }
+            workflow {
+                """
+                input[0] = channel.of([ "SAMPLE_001", [ file("${FIXTURES}/SAMPLE_001.fa") ] ])
+                input[1] = channel.of([ "SAMPLE_001", [completeness: "90.0", contamination: "1.0"] ])
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            def lines = path(workflow.out.metrics[0]).text.readLines()
+            assert lines[0] == "sample\tassembly\tlength\tn50\tgc_content\tn_contigs\tbusco\teukcc_completeness\teukcc_contamination"
+            assert lines[1].startsWith("SAMPLE_001\tSAMPLE_001.fa")
+            assert lines[1].contains("90.0"), lines[1]
+            assert lines[1].contains("1.0"), lines[1]
+        }
+    }
+
+    test("duplicate genome file names abort the run") {
+        options "-stub"
+        when {
+            params { busco_db = "${projectDir}"; busco_mode = "genome" }
+            workflow {
+                """
+                input[0] = channel.of(
+                    [ "SAMPLE_001", [ file("${FIXTURES}/SAMPLE_001.fa") ] ],
+                    [ "SAMPLE_002", [ file("${FIXTURES}/SAMPLE_001.fa") ] ]
+                )
+                input[1] = channel.of([ "SAMPLE_001", [completeness: "90.0", contamination: "1.0"] ])
+                """
+            }
+        }
+        then {
+            // every metric is keyed back to the basename, so a repeat would silently
+            // merge two samples' numbers
+            assert workflow.failed
+            assert workflow.stdout.any { it.contains("unique") } || workflow.errorReport.contains("unique")
+        }
+    }
+}

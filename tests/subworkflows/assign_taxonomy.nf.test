@@ -1,0 +1,58 @@
+nextflow_workflow {
+
+    name "ASSIGN_TAXONOMY"
+    script "../../subworkflows/local/assign_taxonomy/main.nf"
+    workflow "ASSIGN_TAXONOMY"
+
+    // Every genome in the experiment - the reference and the MAGs of both cycles - goes
+    // through here, so both sides of the comparison are classified by identical code.
+    // What matters is that the taxid is the LAST element of EukCC's ncbi_lng chain: that
+    // is the value the whole target-MAG match is keyed on.
+
+    test("the taxid is the last element of the ncbi_lng chain") {
+        options "-stub"
+        when {
+            params { eukcc_db = "${projectDir}" }
+            workflow {
+                """
+                input[0] = channel.of([
+                    [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "reference", slot: "reference"],
+                    file("\${projectDir}/tests/subworkflows/fixtures/assign_taxonomy/SAMPLE_001.fa")
+                ])
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            with(workflow.out.taxonomy) {
+                assert size() == 1
+                def (meta, row) = get(0)
+                assert meta.id == "SAMPLE_001"
+                // the stub emits 1-131567-2759-33154-4751
+                assert row.taxid == "4751"
+                assert row.completeness == "90.0"
+                assert row.contamination == "1.0"
+            }
+        }
+    }
+
+    test("the per-genome eukcc csv is emitted alongside the parsed taxonomy") {
+        options "-stub"
+        when {
+            params { eukcc_db = "${projectDir}" }
+            workflow {
+                """
+                input[0] = channel.of([
+                    [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "cycle1", slot: "cycle1"],
+                    file("\${projectDir}/tests/subworkflows/fixtures/assign_taxonomy/SAMPLE_001.fa")
+                ])
+                """
+            }
+        }
+        then {
+            assert workflow.success
+            assert workflow.out.eukcc.size() == 1
+            assert path(workflow.out.eukcc[0][1]).text.contains("ncbi_lng")
+        }
+    }
+}

@@ -1,0 +1,749 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/EBI-Metagenomics/mag-polishing-pipeline/master/nextflow_schema.json",
+    "title": "EBI-Metagenomics/mag-polishing-pipeline pipeline parameters",
+    "description": "Improves MAG quality by recruiting additional related samples through sequence similarity search",
+    "type": "object",
+    "$defs": {
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "description": "Define where the pipeline should find input data and save output data.",
+            "required": ["input", "outdir"],
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "schema": "assets/schema_input.json",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Path to comma-separated file containing information about the samples in the experiment.",
+                    "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row.",
+                    "fa_icon": "fas fa-file-csv"
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "email": {
+                    "type": "string",
+                    "description": "Email address for completion summary.",
+                    "fa_icon": "fas fa-envelope",
+                    "help_text": "Set this parameter to your e-mail address to get a summary e-mail with details of the run sent to you when the workflow exits. If set in your user config file (`~/.nextflow/config`) then you don't need to specify this on the command line for every run.",
+                    "pattern": "^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$"
+                },
+                "multiqc_title": {
+                    "type": "string",
+                    "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
+                    "fa_icon": "fas fa-file-signature"
+                }
+            }
+        },
+        "pipeline_options": {
+            "title": "Pipeline options",
+            "type": "object",
+            "fa_icon": "fas fa-sliders-h",
+            "description": "The knobs this experiment actually turns.",
+            "properties": {
+                "n_concat_samples": {
+                    "type": "string",
+                    "default": "1,2,3",
+                    "description": "Co-assembly depths, comma separated. One co-assembly dataset, de novo assembly and MAG per value, capped at the number of usable Branchwater hits.",
+                    "help_text": "This is the parameter you sweep to ask how many public runs are worth adding before the MAG stops improving. Each value writes a full pair of concatenated fastqs into the work directory, so a long list is storage hungry: for `1,5,10` one sample writes 2 + 6 + 11 = 19 run-equivalents of fastq.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "skip_first_assembly": {
+                    "type": "boolean",
+                    "description": "Skip cycle 1 entirely and search Branchwater with the samplesheet genome.",
+                    "help_text": "No cycle-1 assembly, no cycle-1 GGP and no `cycle1` slot in any table. Use it when the sample has already been assembled elsewhere, or when the question is only what the public runs add to a genome you already have.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "ena_cache_dir": {
+                    "type": "string",
+                    "default": "ena_cache",
+                    "description": "Shared fastq download cache (a Nextflow storeDir).",
+                    "help_text": "Every ENA run accession is downloaded exactly once, across samples and across N values. Point it somewhere with room and keep it between runs. Expect hundreds of GB.",
+                    "fa_icon": "fas fa-folder-open"
+                }
+            }
+        },
+        "branchwater_options": {
+            "title": "Branchwater options",
+            "type": "object",
+            "fa_icon": "fas fa-search",
+            "description": "Sketching and searching the public metagenome index.",
+            "properties": {
+                "branchwater_index": {
+                    "type": "string",
+                    "description": "sourmash rocksdb index searched by manysearch.",
+                    "format": "directory-path",
+                    "fa_icon": "fas fa-database"
+                },
+                "branchwater_metadata_db": {
+                    "type": "string",
+                    "description": "Branchwater metadata DuckDB, used to resolve hits to ENA runs.",
+                    "format": "file-path",
+                    "fa_icon": "fas fa-database"
+                },
+                "branchwater_k": {
+                    "type": "integer",
+                    "default": 21,
+                    "description": "k-mer size. Must match the index.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "branchwater_scaled": {
+                    "type": "integer",
+                    "default": 1000,
+                    "description": "sourmash sketch scaling factor.",
+                    "fa_icon": "fas fa-compress"
+                },
+                "branchwater_threshold": {
+                    "type": "number",
+                    "default": 0.1,
+                    "description": "Minimum containment for a hit to be considered.",
+                    "fa_icon": "fas fa-filter"
+                }
+            }
+        },
+        "assembly_options": {
+            "title": "Assembly options",
+            "type": "object",
+            "fa_icon": "fas fa-puzzle-piece",
+            "description": "miassembler, applied to both cycles.",
+            "properties": {
+                "assembler": {
+                    "type": "string",
+                    "default": "metaspades",
+                    "description": "Assembler for both cycles.",
+                    "enum": ["metaspades", "megahit"],
+                    "fa_icon": "fas fa-cogs",
+                    "help_text": "metaSPAdes is the default. megahit is the escape hatch for cycle-2 datasets too deep to assemble in the available memory: a fraction of the memory and time, at the cost of a more fragmented assembly. Every slot in a run uses the same assembler, so the comparison stays internally consistent."
+                },
+                "assembly_memory": {
+                    "type": "integer",
+                    "default": 100,
+                    "description": "Memory in GB for the assembler, +50% per retry.",
+                    "fa_icon": "fas fa-memory",
+                    "help_text": "Can be overridden per sample with `meta.assembly_memory`."
+                },
+                "spades_only_assembler": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Pass --only-assembler to metaSPAdes, skipping read error correction.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "max_spades_retries": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Retries for metaSPAdes, each with 50% more memory.",
+                    "fa_icon": "fas fa-redo"
+                },
+                "max_megahit_retries": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Retries for MEGAHIT.",
+                    "fa_icon": "fas fa-redo"
+                },
+                "spades_version": {
+                    "type": "string",
+                    "default": "3.15.5",
+                    "description": "Recorded in meta.assembler_version and part of the assembly publish path.",
+                    "fa_icon": "fas fa-tag"
+                },
+                "megahit_version": {
+                    "type": "string",
+                    "default": "1.2.9",
+                    "description": "Recorded in meta.assembler_version and part of the assembly publish path.",
+                    "fa_icon": "fas fa-tag"
+                }
+            }
+        },
+        "assembly_qc_options": {
+            "title": "Assembly QC options",
+            "type": "object",
+            "fa_icon": "fas fa-check-double",
+            "description": "What leaves the assembler and reaches genomes-generation.",
+            "properties": {
+                "short_reads_min_contig_length": {
+                    "type": "integer",
+                    "default": 500,
+                    "description": "Contigs shorter than this are dropped, and it is QUAST's --min-contig.",
+                    "fa_icon": "fas fa-cut"
+                },
+                "short_reads_contig_threshold": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "An assembly with fewer contigs than this fails QC and produces no MAG.",
+                    "fa_icon": "fas fa-ban"
+                },
+                "short_reads_low_reads_count_threshold": {
+                    "type": "integer",
+                    "default": 1000,
+                    "description": "Fewer reads than this after fastp marks the run QC-failed.",
+                    "fa_icon": "fas fa-ban"
+                },
+                "short_reads_filter_ratio_threshold": {
+                    "type": "number",
+                    "default": 0.1,
+                    "description": "fastp keeping this fraction of the reads or less is a QC failure.",
+                    "fa_icon": "fas fa-ban"
+                },
+                "min_qcov": {
+                    "type": "number",
+                    "default": 0.3,
+                    "description": "Query coverage floor for filterpaf, which decides what counts as a contaminant contig hit.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "min_pid": {
+                    "type": "number",
+                    "default": 0.4,
+                    "description": "Identity floor for filterpaf.",
+                    "fa_icon": "fas fa-filter"
+                }
+            }
+        },
+        "decontamination_options": {
+            "title": "Decontamination references",
+            "type": "object",
+            "fa_icon": "fas fa-soap",
+            "description": "Resolved as <reference_genomes_folder>/<name>/<name>.fna, so these are directory names, not paths.",
+            "properties": {
+                "reference_genomes_folder": {
+                    "type": "string",
+                    "description": "Root holding the decontamination references.",
+                    "format": "directory-path",
+                    "fa_icon": "fas fa-folder"
+                },
+                "human_reference": {
+                    "type": "string",
+                    "description": "Human decontamination of the reads.",
+                    "fa_icon": "fas fa-user"
+                },
+                "phix_reference": {
+                    "type": "string",
+                    "description": "PhiX removal from the contigs.",
+                    "fa_icon": "fas fa-virus"
+                },
+                "contaminant_reference": {
+                    "type": "string",
+                    "description": "Optional extra host or contaminant genome.",
+                    "fa_icon": "fas fa-bug"
+                }
+            }
+        },
+        "binning_options": {
+            "title": "Binning options",
+            "type": "object",
+            "fa_icon": "fas fa-boxes",
+            "description": "genomes-generation.",
+            "properties": {
+                "skip_prok": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Skip the prokaryotic branch. Keep this true: this is a eukaryotic workflow.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "skip_euk": {
+                    "type": "boolean",
+                    "description": "Skip the eukaryotic branch, which is the one producing the MAGs being compared.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "skip_decontamination": {
+                    "type": "boolean",
+                    "description": "Skip GGP's own read decontamination against --ref_genome.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "skip_preprocessing_input": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Skip GGP's input preprocessing. Keep this true: it expects ENA-derived inputs and ours are not.",
+                    "fa_icon": "fas fa-forward"
+                },
+                "merge_pairs": {
+                    "type": "boolean",
+                    "description": "Merge overlapping read pairs in GGP's fastp step.",
+                    "fa_icon": "fas fa-compress-arrows-alt"
+                },
+                "min_contig_size": {
+                    "type": "integer",
+                    "default": 1500,
+                    "description": "Minimum contig length fed to the binners.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "metabat2_rng_seed": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "MetaBAT2's --seed, fixed so binning is reproducible.",
+                    "fa_icon": "fas fa-dice"
+                },
+                "publish_all": {
+                    "type": "boolean",
+                    "description": "GGP's own switch for publishing its intermediates. The genomes are published regardless.",
+                    "fa_icon": "fas fa-copy"
+                },
+                "ena_assembly_study_accession": {
+                    "type": "string",
+                    "default": "mag-polishing",
+                    "description": "Prefix on GGP's report file names. NOT an accession, unless uploads are on.",
+                    "fa_icon": "fas fa-tag"
+                },
+                "subdir_euks": {
+                    "type": "string",
+                    "default": "eukaryotes",
+                    "description": "Name of GGP's euks output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_proks": {
+                    "type": "string",
+                    "default": "prokaryotes",
+                    "description": "Name of GGP's proks output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_rna": {
+                    "type": "string",
+                    "default": "rna",
+                    "description": "Name of GGP's rna output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_taxonomy": {
+                    "type": "string",
+                    "default": "taxonomy",
+                    "description": "Name of GGP's taxonomy output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_stats": {
+                    "type": "string",
+                    "default": "stats",
+                    "description": "Name of GGP's stats output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_coverage": {
+                    "type": "string",
+                    "default": "coverage",
+                    "description": "Name of GGP's coverage output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_bins": {
+                    "type": "string",
+                    "default": "bins",
+                    "description": "Name of GGP's bins output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                },
+                "subdir_mags": {
+                    "type": "string",
+                    "default": "mags",
+                    "description": "Name of GGP's mags output subdirectory.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
+                }
+            }
+        },
+        "ena_upload_options": {
+            "title": "ENA upload options",
+            "type": "object",
+            "fa_icon": "fas fa-cloud-upload-alt",
+            "description": "genomes-generation's uploader. All off, and these submit for real.",
+            "properties": {
+                "upload_mags": {
+                    "type": "boolean",
+                    "description": "Submit the dereplicated MAGs to ENA.",
+                    "fa_icon": "fas fa-cloud-upload-alt",
+                    "help_text": "Needs the Nextflow secrets WEBIN_ACCOUNT and WEBIN_PASSWORD, and --ena_assembly_study_accession set to a registered ENA study. Try --test_upload true first."
+                },
+                "upload_bins": {
+                    "type": "boolean",
+                    "description": "Submit the bins to ENA.",
+                    "fa_icon": "fas fa-cloud-upload-alt"
+                },
+                "test_upload": {
+                    "type": "boolean",
+                    "description": "Submit to ENA's test service instead of live.",
+                    "fa_icon": "fas fa-vial"
+                },
+                "upload_tpa": {
+                    "type": "boolean",
+                    "description": "Pass --tpa, third party annotation.",
+                    "fa_icon": "fas fa-stamp"
+                },
+                "upload_force": {
+                    "type": "boolean",
+                    "description": "Pass --force, overwriting an existing submission.",
+                    "fa_icon": "fas fa-exclamation-triangle"
+                },
+                "metagenome": {
+                    "type": "string",
+                    "description": "Required by genome_upload, e.g. 'soil metagenome'.",
+                    "fa_icon": "fas fa-globe"
+                },
+                "biomes": {
+                    "type": "string",
+                    "description": "Biome terms for the submission.",
+                    "fa_icon": "fas fa-globe"
+                },
+                "centre_name": {
+                    "type": "string",
+                    "description": "Submitting centre.",
+                    "fa_icon": "fas fa-university"
+                }
+            }
+        },
+        "reference_database_options": {
+            "title": "Reference databases",
+            "type": "object",
+            "fa_icon": "fas fa-database",
+            "description": "Set by -profile codon.",
+            "properties": {
+                "eukcc_db": {
+                    "type": "string",
+                    "description": "EukCC reference data: taxonomy and completeness/contamination.",
+                    "format": "directory-path",
+                    "fa_icon": "fas fa-database"
+                },
+                "busco_db": {
+                    "type": "string",
+                    "description": "BUSCO lineage downloads.",
+                    "format": "directory-path",
+                    "fa_icon": "fas fa-database"
+                },
+                "busco_mode": {
+                    "type": "string",
+                    "default": "genome",
+                    "description": "BUSCO -m.",
+                    "enum": ["genome", "transcriptome", "proteins"],
+                    "fa_icon": "fas fa-cog"
+                },
+                "cat_db_folder": {
+                    "type": "string",
+                    "description": "CAT/BAT database folder.",
+                    "format": "directory-path",
+                    "fa_icon": "fas fa-database"
+                },
+                "cat_diamond_db": {
+                    "type": "string",
+                    "description": "CAT/BAT DIAMOND database.",
+                    "fa_icon": "fas fa-database"
+                },
+                "cat_taxonomy_db": {
+                    "type": "string",
+                    "description": "CAT/BAT taxonomy folder.",
+                    "format": "directory-path",
+                    "fa_icon": "fas fa-database"
+                },
+                "ref_genome": {
+                    "type": "string",
+                    "description": "GGP's decontamination reference. Read even when --skip_decontamination is on, so it must point at a real file.",
+                    "format": "file-path",
+                    "fa_icon": "fas fa-dna"
+                }
+            }
+        },
+        "inert_options": {
+            "title": "Inert options",
+            "type": "object",
+            "fa_icon": "fas fa-archive",
+            "description": "Declared because the composed submodules resolve them at config time, but never reached by this pipeline's path. Listed so that nobody spends an afternoon tuning one.",
+            "properties": {
+                "checkm2_db": {
+                    "type": "string",
+                    "description": "Prokaryotic branch only, and --skip_prok is true.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "gunc_db": {
+                    "type": "string",
+                    "description": "Prokaryotic branch only, and --skip_prok is true.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "gtdbtk_db": {
+                    "type": "string",
+                    "description": "Prokaryotic branch only, and --skip_prok is true.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "rfam_rrna_models": {
+                    "type": "string",
+                    "description": "Prokaryotic branch only, and --skip_prok is true.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "long_reads_min_read_length": {
+                    "type": "integer",
+                    "default": 200,
+                    "description": "miassembler's long-read path. Only SHORT_READS_ASSEMBLER is called.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "long_reads_ont_quality_threshold": {
+                    "type": "number",
+                    "default": 0.8,
+                    "description": "miassembler's long-read path. Only SHORT_READS_ASSEMBLER is called.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "long_reads_pacbio_quality_threshold": {
+                    "type": "number",
+                    "default": 0.9,
+                    "description": "miassembler's long-read path. Only SHORT_READS_ASSEMBLER is called.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "max_flye_retries": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "miassembler's long-read path. Only SHORT_READS_ASSEMBLER is called.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "short_reads_min_contig_length_metat": {
+                    "type": "integer",
+                    "default": 200,
+                    "description": "Metatranscriptome path, not used here.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "diamond_db": {
+                    "type": "string",
+                    "description": "miassembler's frameshift correction, long reads only.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "private_study": {
+                    "type": "boolean",
+                    "description": "miassembler's ENA fetch path, replaced by our samplesheet.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "study_accession": {
+                    "type": "string",
+                    "description": "Fallback only, meta always carries one.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "reads_accession": {
+                    "type": "string",
+                    "description": "Fallback only, meta always carries one.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                },
+                "download_data": {
+                    "type": "boolean",
+                    "description": "GGP's ENA download path, replaced by our samplesheet.",
+                    "fa_icon": "fas fa-archive",
+                    "hidden": true
+                }
+            }
+        },
+        "institutional_config_options": {
+            "title": "Institutional config options",
+            "type": "object",
+            "fa_icon": "fas fa-university",
+            "description": "Parameters used to describe centralised config profiles. These should not be edited.",
+            "help_text": "The centralised nf-core configuration profiles use a handful of pipeline parameters to describe themselves. This information is then printed to the Nextflow log when you run a pipeline. You should not need to change these values when you run a pipeline.",
+            "properties": {
+                "custom_config_version": {
+                    "type": "string",
+                    "description": "Git commit id for Institutional configs.",
+                    "default": "master",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "custom_config_base": {
+                    "type": "string",
+                    "description": "Base directory for Institutional configs.",
+                    "default": "https://raw.githubusercontent.com/nf-core/configs/master",
+                    "hidden": true,
+                    "help_text": "If you're running offline, Nextflow will not be able to fetch the institutional config files from the internet. If you don't need them, then this is not a problem. If you do need them, you should download the files from the repo and tell Nextflow where to find them with this parameter.",
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_name": {
+                    "type": "string",
+                    "description": "Institutional config name.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_description": {
+                    "type": "string",
+                    "description": "Institutional config description.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_contact": {
+                    "type": "string",
+                    "description": "Institutional config contact information.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_url": {
+                    "type": "string",
+                    "description": "Institutional config URL link.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                }
+            }
+        },
+        "generic_options": {
+            "title": "Generic options",
+            "type": "object",
+            "fa_icon": "fas fa-file-import",
+            "description": "Less common options for the pipeline, typically set in a config file.",
+            "help_text": "These options are common to all nf-core pipelines and allow you to customise some of the core preferences for how the pipeline runs.\n\nTypically these options would be set in a Nextflow config file loaded for all pipeline runs, such as `~/.nextflow/config`.",
+            "properties": {
+                "version": {
+                    "type": "boolean",
+                    "description": "Display version and exit.",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "publish_dir_mode": {
+                    "type": "string",
+                    "default": "copy",
+                    "description": "Method used to save pipeline results to output directory.",
+                    "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
+                    "fa_icon": "fas fa-copy",
+                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "hidden": true
+                },
+                "email_on_fail": {
+                    "type": "string",
+                    "description": "Email address for completion summary, only when pipeline fails.",
+                    "fa_icon": "fas fa-exclamation-triangle",
+                    "pattern": "^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$",
+                    "help_text": "An email address to send a summary email to when the pipeline is completed - ONLY sent if the pipeline does not exit successfully.",
+                    "hidden": true
+                },
+                "plaintext_email": {
+                    "type": "boolean",
+                    "description": "Send plain-text email instead of HTML.",
+                    "fa_icon": "fas fa-remove-format",
+                    "hidden": true
+                },
+                "max_multiqc_email_size": {
+                    "type": "string",
+                    "description": "File size limit when attaching MultiQC reports to summary emails.",
+                    "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
+                    "default": "25.MB",
+                    "fa_icon": "fas fa-file-upload",
+                    "hidden": true
+                },
+                "monochrome_logs": {
+                    "type": "boolean",
+                    "description": "Do not use coloured log outputs.",
+                    "fa_icon": "fas fa-palette",
+                    "hidden": true
+                },
+                "hook_url": {
+                    "type": "string",
+                    "description": "Incoming hook URL for messaging service",
+                    "fa_icon": "fas fa-people-group",
+                    "help_text": "Incoming hook URL for messaging service. Currently, MS Teams and Slack are supported.",
+                    "hidden": true
+                },
+                "multiqc_config": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Custom config file to supply to MultiQC.",
+                    "fa_icon": "fas fa-cog",
+                    "hidden": true
+                },
+                "multiqc_logo": {
+                    "type": "string",
+                    "description": "Custom logo file to supply to MultiQC. File name must also be set in the MultiQC config file",
+                    "fa_icon": "fas fa-image",
+                    "hidden": true
+                },
+                "multiqc_methods_description": {
+                    "type": "string",
+                    "description": "Custom MultiQC yaml file containing HTML including a methods description.",
+                    "fa_icon": "fas fa-cog"
+                },
+                "validate_params": {
+                    "type": "boolean",
+                    "description": "Boolean whether to validate parameters against the schema at runtime",
+                    "default": true,
+                    "fa_icon": "fas fa-check-square",
+                    "hidden": true
+                },
+                "pipelines_testdata_base_path": {
+                    "type": "string",
+                    "fa_icon": "far fa-check-circle",
+                    "description": "Base URL or local path to location of pipeline test dataset files",
+                    "default": "https://raw.githubusercontent.com/nf-core/test-datasets/",
+                    "hidden": true
+                },
+                "trace_report_suffix": {
+                    "type": "string",
+                    "fa_icon": "far calendar",
+                    "description": "Suffix to add to the trace report filename. Default is the date and time in the format yyyy-MM-dd_HH-mm-ss.",
+                    "hidden": true
+                }
+            }
+        },
+        "environment": {
+            "title": "Environment",
+            "type": "object",
+            "fa_icon": "fas fa-server",
+            "description": "Runtime environment.",
+            "properties": {
+                "singularity_cachedir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Shared Singularity image cache, used by -profile codon as singularity.cacheDir.",
+                    "fa_icon": "fas fa-folder-open"
+                }
+            }
+        }
+    },
+    "allOf": [
+        {
+            "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/pipeline_options"
+        },
+        {
+            "$ref": "#/$defs/branchwater_options"
+        },
+        {
+            "$ref": "#/$defs/assembly_options"
+        },
+        {
+            "$ref": "#/$defs/assembly_qc_options"
+        },
+        {
+            "$ref": "#/$defs/decontamination_options"
+        },
+        {
+            "$ref": "#/$defs/binning_options"
+        },
+        {
+            "$ref": "#/$defs/ena_upload_options"
+        },
+        {
+            "$ref": "#/$defs/reference_database_options"
+        },
+        {
+            "$ref": "#/$defs/inert_options"
+        },
+        {
+            "$ref": "#/$defs/environment"
+        },
+        {
+            "$ref": "#/$defs/institutional_config_options"
+        },
+        {
+            "$ref": "#/$defs/generic_options"
+        }
+    ]
+}
