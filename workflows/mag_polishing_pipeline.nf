@@ -46,8 +46,7 @@ workflow MPP {
      */
     GUNZIP_REFERENCE(
         ch_samplesheet.map { meta, _reads, genome ->
-            def sample = meta.id
-            [ [id: genome_name(genome), sample: sample, origin: "reference", slot: "reference"], genome ]
+            [ [id: genome_name(genome), sample: meta.id, origin: "reference", slot: "reference"], genome ]
         }
     )
     TAXONOMY_REFERENCE( GUNZIP_REFERENCE.out.genome )
@@ -77,14 +76,12 @@ workflow MPP {
 
         // the samplesheet genome as it is, not the GUNZIP copy: sourmash reads gzip natively
         branchwater_query = ch_samplesheet.map { meta, _reads, genome ->
-            def sample = meta.id
-            [ [id: genome_name(genome), sample: sample], genome ]
+            [ [id: genome_name(genome), sample: meta.id], genome ]
         }
     }
     else {
         CYCLE1(
-            ch_samplesheet.map { meta, reads, _genome ->
-            def sample = meta.id [ assembler_meta(sample, CYCLE1_TAG), reads ] }
+            ch_samplesheet.map { meta, reads, _genome -> [ assembler_meta(meta.id, CYCLE1_TAG), reads ] }
         )
 
         cycle1_genomes = CYCLE1.out.bins.combine( sample_ids.map { [it] } ).map { bin, ids ->
@@ -109,8 +106,7 @@ workflow MPP {
      */
     BUILD_CONCAT_DATASETS(
         branchwater_query,
-        ch_samplesheet.map { meta, reads, _genome ->
-            def sample = meta.id [sample, reads] }
+        ch_samplesheet.map { meta, reads, _genome -> [meta.id, reads] }
     )
 
     /*
