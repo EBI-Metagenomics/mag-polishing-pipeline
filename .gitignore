@@ -1,0 +1,32 @@
+# Nextflow
+.nextflow/
+.nextflow.log*
+work/
+results/
+null/
+report*.html
+timeline*.html
+trace*.txt
+dag*.html
+
+# the shared ENA fastq cache (params.ena_cache_dir default) - hundreds of GB
+ena_cache/
+
+# nf-test
+.nf-test/
+.nf-test.log
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# nf-core scratch
+testing/
+testing*
+
+# OS
+.DS_Store
