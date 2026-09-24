@@ -3,13 +3,13 @@ process CALCULATE_ASSEMBLY_STATS {
     container 'quay.io/microbiome-informatics/genomes-pipeline.python3base:v1.1'
 
     label 'process_light'
-    
+
     input:
     path genomes_fnas, stageAs: "new_genomes_dir"
-    
+
     output:
     path "new_genome_stats.tsv", emit: stats_file
-    
+
     script:
     """
     # Compute length, N50, GC content
@@ -22,4 +22,4 @@ process CALCULATE_ASSEMBLY_STATS {
         printf '%s\\t1000\\t500\\t50.0\\t10\\n' "\$(basename \${genome%.*})" >> new_genome_stats.tsv
     done
     """
-}    
+}

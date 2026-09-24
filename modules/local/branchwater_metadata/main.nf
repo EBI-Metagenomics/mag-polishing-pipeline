@@ -29,10 +29,10 @@ process BRANCHWATER_METADATA {
     """
     duckdb ${metadata_db} -readonly -c "
     COPY (
-      SELECT metadata.*
-      FROM metadata
-      INNER JOIN read_csv_auto('${hits_csv}') hits
-        ON metadata.acc = hits.match_name
+        SELECT metadata.*
+        FROM metadata
+        INNER JOIN read_csv_auto('${hits_csv}') hits
+            ON metadata.acc = hits.match_name
     ) TO '${prefix}_hits_metadata.csv' WITH (FORMAT csv, HEADER);
     "
 

@@ -32,6 +32,11 @@ jobs:
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          # nf-core lint shells out to `nextflow config`, which follows the
+          # includeConfig lines in conf/modules.config into pipelines/*/conf/base.config.
+          # Without the submodules those files do not exist and the lint aborts.
+          submodules: recursive
 
       # Pinned, not latest: miassembler's conf/modules.config calls study_reads_folder()
       # from its publishDir closures, and the strict config parser in Nextflow 25+ rejects

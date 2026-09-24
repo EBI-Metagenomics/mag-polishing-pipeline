@@ -9,11 +9,11 @@ sample,fastq_1,fastq_2,genome
 SAMPLE_001,/data/SAMPLE_001_1.fastq.gz,/data/SAMPLE_001_2.fastq.gz,/data/SAMPLE_001.fna.gz
 ```
 
-| column | notes |
-|---|---|
-| `sample` | **at least 7 characters** — miassembler substrings it to build its output paths |
-| `fastq_1` / `fastq_2` | paired-end only, `.fastq.gz` |
-| `genome` | the reference genome/MAG, **must be eukaryotic**, `.fa(.gz)` / `.fna(.gz)` |
+| column                | notes                                                                           |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `sample`              | **at least 7 characters** — miassembler substrings it to build its output paths |
+| `fastq_1` / `fastq_2` | paired-end only, `.fastq.gz`                                                    |
+| `genome`              | the reference genome/MAG, **must be eukaryotic**, `.fa(.gz)` / `.fna(.gz)`      |
 
 `assets/samplesheet_example.csv` is a copy of the above.
 
@@ -40,7 +40,6 @@ nextflow run . -profile docker \
 
 #### On Codon
 
-
 ```bash
 export NXF_VER=24.04.3
 
@@ -53,110 +52,110 @@ nextflow run . -profile codon \
 ### Parameters
 
 Every param the pipeline declares, grouped the way `nextflow.config` groups them. Anything
-marked *from the profile* is set by `-profile codon` and only needs a value when running
+marked _from the profile_ is set by `-profile codon` and only needs a value when running
 elsewhere. Params the composed submodules read but this pipeline never exercises are in
 [Inert params](#inert-params) at the end.
 
 #### Pipeline
 
-| param | default | meaning |
-|---|---|---|
-| `--input` | — | required, see [Input](#input) |
-| `--n_concat_samples` | `1,5,10` | comma separated; one co-assembly dataset per value, capped at the number of usable Branchwater hits. See [Co-assembly depths](#co-assembly-depths---n_concat_samples) |
-| `--skip_first_assembly` | `false` | skip cycle 1 entirely and search Branchwater with the samplesheet genome; no cycle-1 assembly, no cycle-1 GGP, no `cycle1` slot in any table |
-| `--outdir` | `results` | |
-| `--ena_cache_dir` | `ena_cache` | shared fastq cache (`storeDir`); every run accession is downloaded once, across samples and N values. Expect hundreds of GB |
-| `--publish_dir_mode` | `copy` | any Nextflow `publishDir` mode; `symlink` saves space but breaks once `work/` is deleted |
+| param                   | default     | meaning                                                                                                                                                               |
+| ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--input`               | —           | required, see [Input](#input)                                                                                                                                         |
+| `--n_concat_samples`    | `1,5,10`    | comma separated; one co-assembly dataset per value, capped at the number of usable Branchwater hits. See [Co-assembly depths](#co-assembly-depths---n_concat_samples) |
+| `--skip_first_assembly` | `false`     | skip cycle 1 entirely and search Branchwater with the samplesheet genome; no cycle-1 assembly, no cycle-1 GGP, no `cycle1` slot in any table                          |
+| `--outdir`              | `results`   |                                                                                                                                                                       |
+| `--ena_cache_dir`       | `ena_cache` | shared fastq cache (`storeDir`); every run accession is downloaded once, across samples and N values. Expect hundreds of GB                                           |
+| `--publish_dir_mode`    | `copy`      | any Nextflow `publishDir` mode; `symlink` saves space but breaks once `work/` is deleted                                                                              |
 
 #### Branchwater
 
-| param | default | meaning |
-|---|---|---|
-| `--branchwater_index` | from the profile | sourmash rocksdb index searched by `manysearch` |
+| param                       | default          | meaning                                                       |
+| --------------------------- | ---------------- | ------------------------------------------------------------- |
+| `--branchwater_index`       | from the profile | sourmash rocksdb index searched by `manysearch`               |
 | `--branchwater_metadata_db` | from the profile | Branchwater metadata DuckDB, used to resolve hits to ENA runs |
-| `--branchwater_k` | `21` | k-mer size; must match the index (`bw_k21`) |
-| `--branchwater_scaled` | `1000` | sourmash sketch scaling factor |
-| `--branchwater_threshold` | `0.1` | minimum containment for a hit to be considered |
+| `--branchwater_k`           | `21`             | k-mer size; must match the index (`bw_k21`)                   |
+| `--branchwater_scaled`      | `1000`           | sourmash sketch scaling factor                                |
+| `--branchwater_threshold`   | `0.1`            | minimum containment for a hit to be considered                |
 
 #### Assembly (miassembler)
 
-| param | default | meaning |
-|---|---|---|
-| `--assembler` | `metaspades` | `metaspades` or `megahit`. Anything else is rejected before the run starts. Applies to **both** cycles |
-| `--assembly_memory` | `100` | GB for the assembler, +50% per retry. Per sample it can be overridden with `meta.assembly_memory` |
-| `--spades_only_assembler` | `true` | passes `--only-assembler` to metaSPAdes, skipping read error correction. Big time and memory saving; turn off only if you want SPAdes' own correction |
-| `--max_spades_retries` | `3` | retries for metaSPAdes, each with 50% more memory |
-| `--max_megahit_retries` | `3` | same for MEGAHIT |
-| `--spades_version` | `3.15.5` | recorded in `meta.assembler_version`, and part of the assembly publish path |
-| `--megahit_version` | `1.2.9` | same for MEGAHIT |
+| param                     | default      | meaning                                                                                                                                               |
+| ------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--assembler`             | `metaspades` | `metaspades` or `megahit`. Anything else is rejected before the run starts. Applies to **both** cycles                                                |
+| `--assembly_memory`       | `100`        | GB for the assembler, +50% per retry. Per sample it can be overridden with `meta.assembly_memory`                                                     |
+| `--spades_only_assembler` | `true`       | passes `--only-assembler` to metaSPAdes, skipping read error correction. Big time and memory saving; turn off only if you want SPAdes' own correction |
+| `--max_spades_retries`    | `3`          | retries for metaSPAdes, each with 50% more memory                                                                                                     |
+| `--max_megahit_retries`   | `3`          | same for MEGAHIT                                                                                                                                      |
+| `--spades_version`        | `3.15.5`     | recorded in `meta.assembler_version`, and part of the assembly publish path                                                                           |
+| `--megahit_version`       | `1.2.9`      | same for MEGAHIT                                                                                                                                      |
 
 #### Assembly QC (miassembler)
 
 These gate what leaves the assembler and reaches GGP.
 
-| param | default | meaning |
-|---|---|---|
-| `--short_reads_min_contig_length` | `500` | contigs shorter than this are dropped (`seqkit seq`), and it is QUAST's `--min-contig` |
-| `--short_reads_contig_threshold` | `2` | an assembly with fewer contigs than this fails QC and produces no MAG |
-| `--short_reads_low_reads_count_threshold` | `1000` | fewer reads than this after fastp and the run is marked QC-failed |
-| `--short_reads_filter_ratio_threshold` | `0.1` | fastp keeping this fraction or less of the reads is also a QC failure |
-| `--min_qcov` / `--min_pid` | `0.3` / `0.4` | query coverage and identity floors for `filterpaf`, which decides what counts as a contaminant contig hit |
+| param                                     | default       | meaning                                                                                                   |
+| ----------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
+| `--short_reads_min_contig_length`         | `500`         | contigs shorter than this are dropped (`seqkit seq`), and it is QUAST's `--min-contig`                    |
+| `--short_reads_contig_threshold`          | `2`           | an assembly with fewer contigs than this fails QC and produces no MAG                                     |
+| `--short_reads_low_reads_count_threshold` | `1000`        | fewer reads than this after fastp and the run is marked QC-failed                                         |
+| `--short_reads_filter_ratio_threshold`    | `0.1`         | fastp keeping this fraction or less of the reads is also a QC failure                                     |
+| `--min_qcov` / `--min_pid`                | `0.3` / `0.4` | query coverage and identity floors for `filterpaf`, which decides what counts as a contaminant contig hit |
 
 #### Decontamination references (miassembler)
 
 Resolved as `<reference_genomes_folder>/<name>/<name>.fna`, so the names are directory
 names, not paths.
 
-| param | default | meaning |
-|---|---|---|
-| `--reference_genomes_folder` | from the profile | root holding the decontamination references |
-| `--human_reference` | from the profile (`human_GCF_000001405.40`) | human decontamination of the reads |
-| `--phix_reference` | from the profile (`phiX174_GCF_000819615.1`) | PhiX removal from the contigs |
-| `--contaminant_reference` | `null` | optional extra host/contaminant genome |
+| param                        | default                                      | meaning                                     |
+| ---------------------------- | -------------------------------------------- | ------------------------------------------- |
+| `--reference_genomes_folder` | from the profile                             | root holding the decontamination references |
+| `--human_reference`          | from the profile (`human_GCF_000001405.40`)  | human decontamination of the reads          |
+| `--phix_reference`           | from the profile (`phiX174_GCF_000819615.1`) | PhiX removal from the contigs               |
+| `--contaminant_reference`    | `null`                                       | optional extra host/contaminant genome      |
 
 #### Binning (genomes-generation)
 
-| param | default | meaning |
-|---|---|---|
-| `--skip_prok` | `true` | **keep it true.** This is a eukaryotic workflow at the moment; the prokaryotic branch is not exercised |
-| `--skip_euk` | `false` | the eukaryotic branch is the one that produces the MAGs being compared |
-| `--skip_decontamination` | `false` | GGP's own read decontamination, against `--ref_genome` |
-| `--skip_preprocessing_input` | `true` | **keep it true.** GGP's preprocessing expects ENA-derived inputs; ours are not |
-| `--merge_pairs` | `false` | merge overlapping read pairs in GGP's fastp step |
-| `--min_contig_size` | `1500` | minimum contig length fed to the binners |
-| `--metabat2_rng_seed` | `1` | MetaBAT2's `--seed`; fixed so binning is reproducible |
-| `--publish_all` | `false` | GGP's own switch for publishing its intermediates. The genomes are published regardless |
-| `--ena_assembly_study_accession` | `mag-polishing` | prefix on GGP's report file names — **not** an accession, unless uploads are on (see below) |
-| `--subdir_euks`, `--subdir_proks`, `--subdir_bins`, `--subdir_mags`, `--subdir_stats`, `--subdir_taxonomy`, `--subdir_coverage`, `--subdir_rna` | `eukaryotes`, `prokaryotes`, `bins`, `mags`, `stats`, `taxonomy`, `coverage`, `rna` | names of GGP's output subdirectories |
+| param                                                                                                                                           | default                                                                             | meaning                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `--skip_prok`                                                                                                                                   | `true`                                                                              | **keep it true.** This is a eukaryotic workflow at the moment; the prokaryotic branch is not exercised |
+| `--skip_euk`                                                                                                                                    | `false`                                                                             | the eukaryotic branch is the one that produces the MAGs being compared                                 |
+| `--skip_decontamination`                                                                                                                        | `false`                                                                             | GGP's own read decontamination, against `--ref_genome`                                                 |
+| `--skip_preprocessing_input`                                                                                                                    | `true`                                                                              | **keep it true.** GGP's preprocessing expects ENA-derived inputs; ours are not                         |
+| `--merge_pairs`                                                                                                                                 | `false`                                                                             | merge overlapping read pairs in GGP's fastp step                                                       |
+| `--min_contig_size`                                                                                                                             | `1500`                                                                              | minimum contig length fed to the binners                                                               |
+| `--metabat2_rng_seed`                                                                                                                           | `1`                                                                                 | MetaBAT2's `--seed`; fixed so binning is reproducible                                                  |
+| `--publish_all`                                                                                                                                 | `false`                                                                             | GGP's own switch for publishing its intermediates. The genomes are published regardless                |
+| `--ena_assembly_study_accession`                                                                                                                | `mag-polishing`                                                                     | prefix on GGP's report file names — **not** an accession, unless uploads are on (see below)            |
+| `--subdir_euks`, `--subdir_proks`, `--subdir_bins`, `--subdir_mags`, `--subdir_stats`, `--subdir_taxonomy`, `--subdir_coverage`, `--subdir_rna` | `eukaryotes`, `prokaryotes`, `bins`, `mags`, `stats`, `taxonomy`, `coverage`, `rna` | names of GGP's output subdirectories                                                                   |
 
 #### ENA upload (genomes-generation)
 
 All off. See [Uploading to ENA](#uploading-to-ena) — these submit for real.
 
-| param | default | meaning |
-|---|---|---|
-| `--upload_mags` / `--upload_bins` | `false` | submit the MAGs / the bins to ENA |
-| `--test_upload` | `false` | `true` submits to ENA's test service instead of live |
-| `--upload_tpa` | `false` | `--tpa`, third party annotation |
-| `--upload_force` | `false` | `--force`, overwrite an existing submission |
-| `--metagenome` | `""` | required by `genome_upload`, e.g. `soil metagenome` |
-| `--biomes` | `""` | |
-| `--centre_name` | `""` (`EMG` from the profile) | submitting centre |
+| param                             | default                       | meaning                                              |
+| --------------------------------- | ----------------------------- | ---------------------------------------------------- |
+| `--upload_mags` / `--upload_bins` | `false`                       | submit the MAGs / the bins to ENA                    |
+| `--test_upload`                   | `false`                       | `true` submits to ENA's test service instead of live |
+| `--upload_tpa`                    | `false`                       | `--tpa`, third party annotation                      |
+| `--upload_force`                  | `false`                       | `--force`, overwrite an existing submission          |
+| `--metagenome`                    | `""`                          | required by `genome_upload`, e.g. `soil metagenome`  |
+| `--biomes`                        | `""`                          |                                                      |
+| `--centre_name`                   | `""` (`EMG` from the profile) | submitting centre                                    |
 
 #### Reference databases
 
-| param | default | meaning |
-|---|---|---|
-| `--eukcc_db` | from the profile | EukCC reference data — taxonomy *and* completeness/contamination |
-| `--busco_db` | from the profile | BUSCO lineage downloads |
-| `--busco_mode` | `genome` | BUSCO `-m`; `genome`, `transcriptome` or `proteins` |
-| `--cat_db_folder` / `--cat_diamond_db` / `--cat_taxonomy_db` | from the profile | CAT/BAT taxonomy assignment inside GGP |
-| `--ref_genome` | from the profile | GGP's decontamination reference. Read even when `--skip_decontamination` is on, so it must point at a real file |
+| param                                                        | default          | meaning                                                                                                         |
+| ------------------------------------------------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `--eukcc_db`                                                 | from the profile | EukCC reference data — taxonomy _and_ completeness/contamination                                                |
+| `--busco_db`                                                 | from the profile | BUSCO lineage downloads                                                                                         |
+| `--busco_mode`                                               | `genome`         | BUSCO `-m`; `genome`, `transcriptome` or `proteins`                                                             |
+| `--cat_db_folder` / `--cat_diamond_db` / `--cat_taxonomy_db` | from the profile | CAT/BAT taxonomy assignment inside GGP                                                                          |
+| `--ref_genome`                                               | from the profile | GGP's decontamination reference. Read even when `--skip_decontamination` is on, so it must point at a real file |
 
 #### Environment
 
-| param | default | meaning |
-|---|---|---|
+| param                    | default          | meaning                                                                            |
+| ------------------------ | ---------------- | ---------------------------------------------------------------------------------- |
 | `--singularity_cachedir` | from the profile | shared Singularity image cache, used by `-profile codon` as `singularity.cacheDir` |
 
 #### Inert params
@@ -164,31 +163,31 @@ All off. See [Uploading to ENA](#uploading-to-ena) — these submit for real.
 Declared because the composed submodules resolve them at config time, but never reached by
 this pipeline's path.
 
-| param | default | why it is inert |
-|---|---|---|
-| `--checkm2_db`, `--gunc_db`, `--gtdbtk_db`, `--rfam_rrna_models` | from the profile | prokaryotic branch only, and `--skip_prok true` |
-| `--long_reads_min_read_length`, `--long_reads_ont_quality_threshold`, `--long_reads_pacbio_quality_threshold`, `--max_flye_retries` | `200`, `0.8`, `0.9`, `3` | miassembler's long-read path; we only call `SHORT_READS_ASSEMBLER` |
-| `--short_reads_min_contig_length_metat` | `200` | metatranscriptome path |
-| `--diamond_db` | from the profile | miassembler's frameshift correction, long reads only |
-| `--private_study`, `--study_accession`, `--reads_accession` | `false`, `null`, `null` | miassembler's ENA fetch path. We build `meta` ourselves in `main.nf`, so `study_accession` is only a fallback that never fires |
-| `--download_data` | `false` | GGP's ENA download path, replaced by our own samplesheet |
-| `--multiqc_title` | `null` | GGP v1.3.3 has its `MULTIQC` import commented out, so no report is produced |
+| param                                                                                                                               | default                  | why it is inert                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `--checkm2_db`, `--gunc_db`, `--gtdbtk_db`, `--rfam_rrna_models`                                                                    | from the profile         | prokaryotic branch only, and `--skip_prok true`                                                                                |
+| `--long_reads_min_read_length`, `--long_reads_ont_quality_threshold`, `--long_reads_pacbio_quality_threshold`, `--max_flye_retries` | `200`, `0.8`, `0.9`, `3` | miassembler's long-read path; we only call `SHORT_READS_ASSEMBLER`                                                             |
+| `--short_reads_min_contig_length_metat`                                                                                             | `200`                    | metatranscriptome path                                                                                                         |
+| `--diamond_db`                                                                                                                      | from the profile         | miassembler's frameshift correction, long reads only                                                                           |
+| `--private_study`, `--study_accession`, `--reads_accession`                                                                         | `false`, `null`, `null`  | miassembler's ENA fetch path. We build `meta` ourselves in `main.nf`, so `study_accession` is only a fallback that never fires |
+| `--download_data`                                                                                                                   | `false`                  | GGP's ENA download path, replaced by our own samplesheet                                                                       |
+| `--multiqc_title`                                                                                                                   | `null`                   | GGP v1.3.3 has its `MULTIQC` import commented out, so no report is produced                                                    |
 
 ### Co-assembly depths: `--n_concat_samples`
 
 This is the knob the experiment turns. Everything else in the pipeline is fixed for a
-given sample; `--n_concat_samples` is what you sweep to ask *how many public runs are
-worth adding before the MAG stops improving*.
+given sample; `--n_concat_samples` is what you sweep to ask _how many public runs are
+worth adding before the MAG stops improving_.
 
 It takes a comma-separated list of depths, and **each value becomes its own co-assembly
 dataset, its own de novo assembly and its own MAG**. With `--n_concat_samples 1,5,10` a
 sample produces:
 
-| value | dataset | assembled as |
-|---|---|---|
-| `1` | sample reads + the top-1 Branchwater hit | `<sample>_n1` |
-| `5` | sample reads + the top-5 hits | `<sample>_n5` |
-| `10` | sample reads + the top-10 hits | `<sample>_n10` |
+| value | dataset                                  | assembled as   |
+| ----- | ---------------------------------------- | -------------- |
+| `1`   | sample reads + the top-1 Branchwater hit | `<sample>_n1`  |
+| `5`   | sample reads + the top-5 hits            | `<sample>_n5`  |
+| `10`  | sample reads + the top-10 hits           | `<sample>_n10` |
 
 The hits are the same ranked list every time — `n5` is `n1` plus the next four — so the
 depths are nested and the comparison reads as a curve. Each one lands in its own column
@@ -251,17 +250,17 @@ is a deliberate decision, not a side effect of running the workflow.
 `--upload_mags true` and/or `--upload_bins true` turn it on. Both submit **for real** —
 there is no dry run, only ENA's test service.
 
-| param | default | meaning |
-|---|---|---|
-| `--upload_mags` | `false` | submit the dereplicated MAGs |
-| `--upload_bins` | `false` | submit the bins |
-| `--test_upload` | `false` | `true` submits to ENA's **test** service (`ena-webin-cli -test`). Always do this first |
-| `--ena_assembly_study_accession` | `mag-polishing` | passed verbatim to `genome_upload -u`, so with uploads on it has to be a registered ENA study (`PRJ…`, `ERP…`) |
-| `--metagenome` | `""` | required, e.g. `soil metagenome` |
-| `--biomes` | `""` | |
-| `--centre_name` | `""` (`EMG` under `-profile codon`) | |
-| `--upload_tpa` | `false` | `--tpa`, third party annotation |
-| `--upload_force` | `false` | `--force`, overwrite an existing submission |
+| param                            | default                             | meaning                                                                                                        |
+| -------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--upload_mags`                  | `false`                             | submit the dereplicated MAGs                                                                                   |
+| `--upload_bins`                  | `false`                             | submit the bins                                                                                                |
+| `--test_upload`                  | `false`                             | `true` submits to ENA's **test** service (`ena-webin-cli -test`). Always do this first                         |
+| `--ena_assembly_study_accession` | `mag-polishing`                     | passed verbatim to `genome_upload -u`, so with uploads on it has to be a registered ENA study (`PRJ…`, `ERP…`) |
+| `--metagenome`                   | `""`                                | required, e.g. `soil metagenome`                                                                               |
+| `--biomes`                       | `""`                                |                                                                                                                |
+| `--centre_name`                  | `""` (`EMG` under `-profile codon`) |                                                                                                                |
+| `--upload_tpa`                   | `false`                             | `--tpa`, third party annotation                                                                                |
+| `--upload_force`                 | `false`                             | `--force`, overwrite an existing submission                                                                    |
 
 Credentials are Nextflow secrets, not params:
 
