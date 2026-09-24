@@ -1,0 +1,120 @@
+%% Render:
+%%   uvx --python 3.12 --from 'nf-metro>=2.0.0' nf-metro render assets/metro_map.mmd \
+%%     -o docs/images/metro_map.svg --no-chrome-css --no-self-color-scheme
+%%   python3 -c "import re,sys;p='docs/images/metro_map.svg';s=open(p).read();\
+%%     open(p,'w').write(re.sub(r'(fill|stroke)=\"rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)\"',\
+%%     lambda m:'%s=\"#%02x%02x%02x\" %s-opacity=\"%s\"'%(m[1],int(m[2]),int(m[3]),int(m[4]),m[1],m[5]),s))"
+%%
+%% Both steps are needed:
+%%   --no-chrome-css / --no-self-color-scheme drop the <style> block and the color-scheme
+%%     attribute, so the baked light palette renders everywhere. Without them the SVG
+%%     carries light-dark(...) and flips to the dark palette in a dark-mode viewer.
+%%   the python step rewrites nf-metro's fill="rgba(r,g,b,a)" into fill + fill-opacity.
+%%     rgba() is CSS syntax and is NOT valid in an SVG presentation attribute; a strict
+%%     renderer discards it and falls back to the default fill, painting the legend box
+%%     solid black.
+%% Style:   https://nf-co.re/docs/community/brand/workflow-schematics
+%%metro title: mag-polishing-pipeline
+%%metro caption: mag-polishing-pipeline - main.nf, one Nextflow runtime composing miassembler, genomes-generation, branchwater and compare
+%%metro style: nfcore-light
+%%metro legend: br
+%%metro directional: true
+%%metro grid: inp | 0,0
+%%metro grid: cy1 | 1,0
+%%metro grid: bw | 2,0
+%%metro grid: cy2 | 1,1
+%%metro grid: cmp | 2,1
+%%metro line: ref | Reference genome / target taxid | #24B064
+%%metro line: c1 | Cycle 1 - sample on its own | #3F8EDE
+%%metro line: hits | Branchwater hits -> ENA runs | #E8A33D | dashed
+%%metro line: c2 | Cycle 2 - co-assembly (n = 1,5,10) | #9B59B6
+
+graph LR
+    subgraph inp [Input and fail-fast checks]
+        sheet[ ]
+        refgz[GUNZIP_GENOME]
+        eukccref[EUKCC_SINGLE]
+        taxid[target taxid]
+        sheet -->|ref| refgz
+        refgz -->|ref| eukccref
+        eukccref -->|ref| taxid
+    end
+
+    subgraph cy1 [Cycle 1 - sample alone]
+        %%metro entry: left | c1
+        %%metro entry: top | ref
+        asm1[SHORT_READS_ASSEMBLER]
+        ggp1[GGP]
+        gz1[GUNZIP_GENOME]
+        eukcc1[EUKCC_SINGLE]
+        pick1[pick_target]
+        asm1 -->|c1| ggp1
+        ggp1 -->|c1| gz1
+        gz1 -->|c1| eukcc1
+        eukcc1 -->|c1| pick1
+    end
+
+    subgraph bw [Branchwater search and ENA fetch]
+        sketch[SOURMASH_SKETCH]
+        msearch[SOURMASH_MANYSEARCH]
+        bmeta[BRANCHWATER_METADATA]
+        select[SELECT_BRANCHWATER_HITS]
+        ena[ENA_FETCH_FASTQ]
+        concat[CONCAT_FASTQ]
+        sketch -->|hits| msearch
+        msearch -->|hits| bmeta
+        bmeta -->|hits| select
+        select -->|hits| ena
+        ena -->|hits| concat
+    end
+
+    subgraph cy2 [Cycle 2 - sample co-assembled with the hits]
+        %%metro entry: left | c2
+        %%metro entry: top | ref
+        asm2[SHORT_READS_ASSEMBLER]
+        ggp2[GGP]
+        gz2[GUNZIP_GENOME]
+        eukcc2[EUKCC_SINGLE]
+        pick2[pick_target]
+        asm2 -->|c2| ggp2
+        ggp2 -->|c2| gz2
+        gz2 -->|c2| eukcc2
+        eukcc2 -->|c2| pick2
+    end
+
+    subgraph cmp [Comparison and tables]
+        cset[comparison set]
+        busco[BUSCO]
+        astats[CALCULATE_ASSEMBLY_STATS]
+        qc[ ]
+        tabs[ ]
+        cset -->|ref,c1,c2| busco
+        cset -->|ref,c1,c2| astats
+        busco -->|ref,c1,c2| qc
+        astats -->|ref,c1,c2| qc
+        cset -->|ref,c1,c2| tabs
+    end
+
+    sheet -->|c1| asm1
+    sheet -->|c2| concat
+    taxid -->|ref| pick1
+    pick1 -->|hits| sketch
+    concat -->|c2| asm2
+    taxid -->|ref| pick2
+    pick1 -->|c1| cset
+    pick2 -->|c2| cset
+    taxid -->|ref| cset
+
+%%metro file: sheet | samplesheet.csv
+%%metro file: qc | assembly_qc_metrics.tsv
+%%metro files: tabs | eukcc_taxonomy.tsv, all_mags.tsv, target_mags.tsv
+%%metro off_track: sheet, qc, tabs
+
+%%metro group: sample, fastq_1, fastq_2, genome - sample id >= 7 chars | refgz | below
+%%metro group: pick_target, one per slot (n) | pick2 | below
+%%metro group: must descend from 2759 (Eukaryota) or the run aborts | taxid | above
+%%metro group: --skip_prok; take bins (per-run derep, QS50), not mags | ggp1 | above
+%%metro group: pick_target: taxid == reference, best completeness | eukcc1, pick1 | below
+%%metro group: no self-hit, PAIRED only, on ENA, ranked by containment | select | above
+%%metro group: n capped at the usable hits, deduped - no usable hit, no cycle 2 | concat | below
+%%metro group: every EukCC row, NA when nothing matched | tabs | below

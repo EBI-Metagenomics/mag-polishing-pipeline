@@ -6,11 +6,12 @@ Branchwater metadata dump (acc, librarylayout) on hits.match_name == metadata.ac
 the self hit, keeps paired-end runs, ranks by containment and then verifies - through the
 ENA portal API - that the fastqs are actually downloadable before emitting the top N.
 
-The self hit is dropped by accession (--exclude, the sample id). When that accession is
-not among the hits - the samplesheet id is not the SRA run, or the run is not in the
-index - it falls back to dropping whatever scores >= 0.99 on both containment and ANI. A
-MAG never contains 100% of its own run's hashes (it is an assembly of it, not it), so the
-old 0.9999-on-both test never fired and the self hit ate one of the N slots.
+The self hit is dropped by accession (--exclude, the sample id), and then the score is not
+consulted at all. Only when that accession is not among the hits - the samplesheet id is
+not the SRA run, or the run is not in the index - does it fall back to dropping the first
+hit scoring >= 0.99 on both containment and ANI. One or the other, never both, and exactly
+one row at most: a second run scoring that high is a different run that happens to be near
+identical, and is a real candidate.
 
 The Branchwater index is SRA derived, so a hit is not necessarily in ENA; that is why the
 availability check is here and not in the download step.
@@ -34,20 +35,44 @@ def read_csv(path):
 
 
 def rank_candidates(hits, metadata, exclude=None, self_hit_threshold=SELF_HIT_THRESHOLD):
-    """[{acc, containment}] ranked by containment desc, self hit and non-paired dropped."""
+    """[{acc, containment}] ranked by containment desc, self hit and non-paired dropped.
+
+    The self hit is dropped one of two ways, never both:
+
+    - `exclude` is among the hits: drop that accession and nothing else. The accession is
+      authoritative, so the score is not consulted at all and a hit that happens to score
+      1.0/1.0 is kept.
+    - otherwise (no `exclude`, or it is not among the hits): fall back to dropping the
+      *first* hit scoring >= `self_hit_threshold` on both containment and ANI, and only
+      that one. There is exactly one self hit; a second run scoring that high is a
+      different run that happens to be near identical, and is a real candidate.
+
+    Either way exactly one row is dropped, at most. The fallback is a heuristic and the
+    accession is not, which is why one replaces the other rather than both applying.
+
+    The fallback assumes `hits` arrives ordered by containment descending, which is what
+    `sourmash scripts manysearch` emits. If that ever stops holding, this drops the wrong
+    row - it would then have to pick the highest scorer rather than the first.
+    """
     layout_by_acc = {row["acc"]: (row.get("librarylayout") or "").upper() for row in metadata}
     accessions = [hit["match_name"].split()[0] for hit in hits]
     by_accession = exclude in accessions
 
     candidates = []
+    self_hit_dropped = False
     for acc, hit in zip(accessions, hits):
         containment = float(hit.get("containment") or 0)
         ani = float(hit.get("query_containment_ani") or 0)
         if by_accession:
             if acc == exclude:
                 continue  # the sample's own run
-        elif containment >= self_hit_threshold and ani >= self_hit_threshold:
-            continue  # no usable accession, so score it instead
+        elif (
+            not self_hit_dropped
+            and containment >= self_hit_threshold
+            and ani >= self_hit_threshold
+        ):
+            self_hit_dropped = True
+            continue
         if layout_by_acc.get(acc) != "PAIRED":
             continue
         candidates.append({"acc": acc, "containment": containment})
