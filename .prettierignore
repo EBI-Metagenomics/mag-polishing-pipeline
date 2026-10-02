@@ -11,3 +11,8 @@ testing*
 *.pyc
 bin/
 ro-crate-metadata.json
+
+# Test fixtures are data, not source. Some are deliberately malformed - that is what the
+# tests assert on - and reformatting any of them would change what is under test.
+tests/fixtures/
+tests/**/fixtures/
