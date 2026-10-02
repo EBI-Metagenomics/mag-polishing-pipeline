@@ -32,4 +32,30 @@ nextflow_function {
         when { function { """ input[0] = "MYSTERY_concoct_1.fa.gz"; input[1] = ["SAMPLE_001"] """ } }
         then { assert function.failed }
     }
+
+    def VERSIONS = "\${projectDir}/tests/functions/fixtures/versions"
+
+    test("a well formed versions.yml is kept") {
+        function "parses_as_versions_map"
+        when { function { """ input[0] = file("${VERSIONS}/good.yml") """ } }
+        then { assert function.success; assert function.result == true }
+    }
+
+    test("a bare scalar is dropped - this is the String.collectEntries() crash") {
+        function "parses_as_versions_map"
+        when { function { """ input[0] = file("${VERSIONS}/scalar.yml") """ } }
+        then { assert function.result == false }
+    }
+
+    test("an empty versions.yml is dropped - this is the null.collectEntries() crash") {
+        function "parses_as_versions_map"
+        when { function { """ input[0] = file("${VERSIONS}/empty.yml") """ } }
+        then { assert function.result == false }
+    }
+
+    test("a file that does not parse at all is dropped, not raised") {
+        function "parses_as_versions_map"
+        when { function { """ input[0] = file("${VERSIONS}/broken.yml") """ } }
+        then { assert function.success; assert function.result == false }
+    }
 }

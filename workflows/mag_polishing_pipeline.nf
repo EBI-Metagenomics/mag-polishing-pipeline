@@ -229,6 +229,14 @@ workflow MPP {
         BUILD_CONCAT_DATASETS.out.versions,
     )
 
+    ch_versions = ch_versions.filter { versions_file ->
+        if ( parses_as_versions_map( versions_file ) ) {
+            return true
+        }
+        log.warn "Skipping unparseable versions.yml: ${versions_file}"
+        return false
+    }
+
     softwareVersionsToYAML(ch_versions)
         .collectFile(
             storeDir: "${params.outdir}/pipeline_info",
@@ -248,6 +256,15 @@ workflow MPP {
     FUNCTIONS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+
+def parses_as_versions_map( yaml_file ) {
+    try {
+        return new org.yaml.snakeyaml.Yaml().load( yaml_file ) instanceof Map
+    }
+    catch ( Exception ignored ) {  // noqa - an unparseable version string is not a failure
+        return false
+    }
+}
 
 /*
  * The meta SHORT_READS_ASSEMBLER and GGP need. `study_accession` is the cycle tag, which
