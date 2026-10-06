@@ -51,10 +51,9 @@ nextflow run . -profile codon \
 
 ### Parameters
 
-Every param the pipeline declares, grouped the way `nextflow.config` groups them. Anything
-marked _from the profile_ is set by `-profile codon` and only needs a value when running
-elsewhere. Params the composed submodules read but this pipeline never exercises are in
-[Inert params](#inert-params) at the end.
+Anything marked _from the profile_ is set by `-profile codon` and only needs a value when
+running elsewhere. Params the composed submodules read but this pipeline never exercises
+are in [Inert params](#inert-params) at the end.
 
 #### Pipeline
 
@@ -130,7 +129,7 @@ names, not paths.
 
 #### ENA upload (genomes-generation)
 
-All off. See [Uploading to ENA](#uploading-to-ena) — these submit for real.
+All off. See [Uploading to ENA](#uploading-to-ena).
 
 | param                             | default                       | meaning                                              |
 | --------------------------------- | ----------------------------- | ---------------------------------------------------- |
@@ -195,20 +194,17 @@ slot of `compare/assembly_qc_metrics.tsv`, in ascending order, next to the refer
 genome and the cycle-1 MAG. That is the whole point: a single value tells you what one
 co-assembly produced, a list tells you whether more data kept helping.
 
-Reasonable sweeps:
+Example of logics:
 
-- `--n_concat_samples 1` — not a benchmark, just "co-assemble with the best hit". Cheapest
-  useful run.
-- `--n_concat_samples 1,5,10` (the default) — the standard curve, coarse enough to see the
-  shape without paying for every step.
-- `--n_concat_samples 1,2,3,5,10,20` — a fine sweep for one or two samples when you are
-  actually looking for the point of diminishing returns. Expensive; see below.
+- `--n_concat_samples 2` — not a benchmark, just "co-assemble with the two best hits".
+- `--n_concat_samples 1,2,3` - the default, for benchmark.
+- `--n_concat_samples 1,2,3,5,10,20` — when you are actually looking for the point of diminishing returns.
 
-#### This is storage hungry
+#### n_concat_samples is storage hungry
 
 Every value in the list writes a **full pair of concatenated fastqs** into the work
-directory and then feeds them to metaSPAdes. The reads are not shared between depths —
-`n5` does not reuse `n1`'s file, it is a new concatenation — so the fastqs written for one
+directory and then feeds them to the assembler (metaSPAdes or megahit). The reads are not shared
+between depths — `n5` does not reuse `n1`'s file, it is a new concatenation — so the fastqs written for one
 sample are roughly:
 
 ```

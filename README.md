@@ -1,11 +1,5 @@
 # mag-polishing-pipeline
 
-Improves MAG quality by recruiting additional related samples through sequence similarity search. Assembles an initial sample via [miassembler](https://github.com/EBI-Metagenomics/miassembler) (optional), bin MAGs via [genomes-generation pipeline](https://github.com/EBI-Metagenomics/genomes-generation) (GGP), then queries branchwater for matching samples.
-
-For each sample (paired reads + a reference genome) the pipeline assembles and bins the sample on its own, finds the public runs containing the target organism, and re-assembles the sample together with the top N of them (`--n_concat_samples`). The output is one table comparing the provided reference genome, the cycle-1 MAG (optional) and one cycle-2 MAG per co-assembly depth (per `--n_concat_samples` value).
-
-With `--skip_first_assembly` the first cycle is dropped: Branchwater searches with the parsed reference genome and the run is reference vs cycle 2 only.
-
 [![Open in GitHub Codespaces](https://img.shields.io/badge/Open_In_GitHub_Codespaces-black?labelColor=grey&logo=github)](https://github.com/codespaces/new/EBI-Metagenomics/mag-polishing-pipeline)
 [![GitHub Actions CI Status](https://github.com/EBI-Metagenomics/mag-polishing-pipeline/actions/workflows/nf_tests.yml/badge.svg)](https://github.com/EBI-Metagenomics/mag-polishing-pipeline/actions/workflows/nf_tests.yml)
 [![GitHub Actions Linting Status](https://github.com/EBI-Metagenomics/mag-polishing-pipeline/actions/workflows/linting.yml/badge.svg)](https://github.com/EBI-Metagenomics/mag-polishing-pipeline/actions/workflows/linting.yml)
@@ -15,6 +9,17 @@ With `--skip_first_assembly` the first cycle is dropped: Branchwater searches wi
 [![nf-core template version](https://img.shields.io/badge/nf--core_template-3.2.0-green?style=flat&logo=nfcore&logoColor=white&color=%2324B064&link=https%3A%2F%2Fnf-co.re)](https://github.com/nf-core/tools/releases/tag/3.2.0)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
+
+Improves MAG quality by recruiting additional related samples through sequence similarity search. Assembles an initial sample via [miassembler](https://github.com/EBI-Metagenomics/miassembler) (optional), bin MAGs via [genomes-generation pipeline](https://github.com/EBI-Metagenomics/genomes-generation) (GGP), then queries branchwater for matching samples.
+
+For each sample (paired reads + a reference genome) the pipeline assembles and bins the sample on its own (referred here as cycle-1), finds the public runs containing the target organism, and re-assembles the sample together with the top N of them (`--n_concat_samples`,referred here as cycle-2). The output is one table comparing the provided reference genome, the cycle-1 MAG (optional) and one cycle-2 MAG per co-assembly depth (per `--n_concat_samples` value).
+
+With `--skip_first_assembly` the first cycle is dropped: Branchwater searches with the parsed reference genome and the run is reference vs cycle 2 only.
+
+> [!NOTE]
+> For now, the pipeline works only for eukaryotes and the --n_concat_samples accepts comma-separated values
+> e.g. --n_concat_samples 1,2,3. The ideia is use this logic to benchmark how many samples, in general,
+> we should use to improve a MAG.
 
 ## Requirements
 
@@ -114,23 +119,6 @@ nextflow config . -profile codon
 # the nf-core template contract. The version MUST match `nf_core_version` in .nf-core.yml
 NXF_SYNTAX_PARSER=v1 uvx --from 'nf-core==3.2.0' nf-core pipelines lint
 ```
-
-`tests/` follows the layout of
-[genomes-catalogue-pipeline](https://github.com/EBI-Metagenomics/genomes-catalogue-pipeline/tree/master/tests):
-
-```
-tests/
-├── scripts/       pytest for bin/*.py, with fixtures/
-├── functions/     nf-test for the Groovy helpers (genome_name, owner_of, concat_depths)
-├── modules/       nf-test for modules/local/*, with fixtures/
-├── subworkflows/  nf-test for subworkflows/local/*, with fixtures/
-└── fixtures/      the samplesheet and empty reads that -profile test points at
-```
-
-Every nf-test drives a `stub:` block and runs with no container engine
-(`tests/nextflow.config`), so the whole suite is seconds and needs neither Docker nor the
-reference databases. The two exceptions are `GUNZIP_GENOME`'s tests, which run for real
-because `gunzip` is on any host.
 
 A full run of `main.nf` is not testable here: several miassembler and GGP processes
 (`SPADES` among them) have no `stub` block, so they would actually run. That is why the
