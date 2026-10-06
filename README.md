@@ -52,6 +52,29 @@ compared against. Then:
 ```bash
 NXF_VER=24.04.3 nextflow run EBI-Metagenomics/mag-polishing-pipeline \
    -profile <docker/singularity/codon> \
+   --n_concat_samples 2 \
+   --input samplesheet.csv \
+   --outdir <OUTDIR>
+```
+
+Using megahit as assembler
+
+```bash
+NXF_VER=24.04.3 nextflow run EBI-Metagenomics/mag-polishing-pipeline \
+   -profile <docker/singularity/codon> \
+   --n_concat_samples 2 \
+   --assembler megahit \
+   --input samplesheet.csv \
+   --outdir <OUTDIR>
+```
+
+Creating more than one concatenated dataset (e.g. for benchmark)
+
+```bash
+NXF_VER=24.04.3 nextflow run EBI-Metagenomics/mag-polishing-pipeline \
+   -profile <docker/singularity/codon> \
+   --n_concat_samples 1,2,3 \
+   --assembler megahit \
    --input samplesheet.csv \
    --outdir <OUTDIR>
 ```
