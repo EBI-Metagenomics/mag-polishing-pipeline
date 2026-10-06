@@ -136,24 +136,6 @@ A full run of `main.nf` is not testable here: several miassembler and GGP proces
 (`SPADES` among them) have no `stub` block, so they would actually run. That is why the
 pipeline-level check is `-preview` rather than an nf-test.
 
-> [!IMPORTANT] > **Pin the nf-core tools version.** This repo is on template 3.2.0 (`nf_core_version` in
-> `.nf-core.yml`), and nf-core's linter is not compatible across template generations:
->
-> | tools     | on this repo                            | why                                                            |
-> | --------- | --------------------------------------- | -------------------------------------------------------------- |
-> | **3.2.0** | 191 passed, 0 failed                    | matches the template                                           |
-> | 4.0.2     | `KeyError: 'manifest.name'`             | broken upstream — it crashes on a pipeline it generated itself |
-> | 4.1.0     | `IndexError: string index out of range` | 4.x linter cannot read a 3.2.0 template                        |
->
-> The CI workflow gets this right automatically: `.github/workflows/linting.yml` reads
-> `nf_core_version` out of `.nf-core.yml` and installs exactly that.
-
-> [!NOTE] > `NXF_SYNTAX_PARSER=v1` is only needed when the Nextflow on your `PATH` is 25.04 or newer,
-> which `nf-core` shells out to. miassembler's `conf/modules.config` calls
-> `study_reads_folder(meta)` from its `publishDir` closures, and the strict config parser
-> introduced in Nextflow 25 rejects function definitions in `nextflow.config`. The pipeline
-> itself runs on 24.04.3, where the default parser handles it.
-
 ## Credits
 
 EBI-Metagenomics/mag-polishing-pipeline was originally written by Filipe Dezordi.
