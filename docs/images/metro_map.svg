@@ -500,7 +500,7 @@
 <path d="M2663.5,452.0 L2681.5,452.0 L2689.5,460.0 L2689.5,482.0 Q2689.5,484.0,2687.5,484.0 L2663.5,484.0 Q2661.5,484.0,2661.5,482.0 L2661.5,454.0 Q2661.5,452.0,2663.5,452.0 Z" fill="#ffffff" stroke="#333333" stroke-width="1.5" stroke-linejoin="round" />
 <path d="M2681.5,452.0 L2681.5,460.0 L2689.5,460.0 Z" fill="#333333" opacity="0.15" stroke="none" />
 <path d="M2681.5,452.0 L2681.5,460.0 L2689.5,460.0" fill="none" stroke="#333333" stroke-width="0.8999999999999999" />
-<text x="2675.5" y="469.2" font-size="1.6666666666666667" fill="#000000" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="bold" text-anchor="middle" dy="0.3em">assembly_qc_metrics.tsv</text>
+<text x="2675.5" y="469.2" font-size="1.6666666666666667" fill="#000000" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="bold" text-anchor="middle" dy="0.3em">output.tsv</text>
 </g>
 </g>
 <g class="nf-metro-station-group" data-node-id="tabs" data-node-cx="2076.1" data-node-cy="428.0" data-node-r="5.0" data-node-groups="c1,c2,ref" data-node-region="cmp" data-node-w="10.0" data-node-h="18.0" data-node-rx="5.0">

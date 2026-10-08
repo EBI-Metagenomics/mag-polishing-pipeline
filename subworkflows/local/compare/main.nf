@@ -14,7 +14,7 @@ include { COLLECT_ASSEMBLIES       } from '../../../modules/local/collect_assemb
 workflow COMPARE {
 
     take:
-    genomes     // channel: [ val(meta), path(fasta) ]  meta: sample, source (reference | cycle1 | nN), ani, af_reference
+    genomes     // channel: [ val(meta), path(fasta) ]  meta: sample, source (reference | cycle1 | nN), runs, ani, af_reference
     eukcc_rows  // channel: [ val(genome), [completeness: .., contamination: ..] ]  genome == fasta.baseName
 
     main:
@@ -47,7 +47,7 @@ workflow COMPARE {
         .map { row -> [row.Genome, row] }
 
     header = [
-        "sample", "assembly", "source", "length", "n50", "gc_content", "n_contigs",
+        "sample", "assembly", "source", "concatenated_runs", "length", "n50", "gc_content", "n_contigs",
         "eukcc_completeness", "eukcc_contamination", "busco", "ani_reference", "af_reference"
     ]
 
@@ -68,6 +68,7 @@ workflow COMPARE {
                         meta.sample,
                         fasta.name,
                         source_label(meta.source),
+                        meta.runs,
                         stats[name]?.Length,
                         stats[name]?.N50,
                         stats[name]?.GC_content,
@@ -81,7 +82,7 @@ workflow COMPARE {
                 }
             ([header.join('\t')] + lines).join('\n') + '\n'
         }
-        .collectFile(name: "assembly_qc_metrics.tsv", storeDir: "${params.outdir}/compare")
+        .collectFile(name: "output.tsv", storeDir: "${params.outdir}")
 
     emit:
     metrics = metrics

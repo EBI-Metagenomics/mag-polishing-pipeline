@@ -38,7 +38,7 @@ workflow EBIMETAGENOMICS_MPP {
     )
 
     emit:
-    comparison = MPP.out.comparison // channel: /path/to/assembly_qc_metrics.tsv
+    comparison = MPP.out.comparison // channel: /path/to/output.tsv
 }
 
 /*

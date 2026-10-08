@@ -234,14 +234,26 @@ workflow MPP {
 
     /*
      * The comparison set: reference, cycle 1, one cycle 2 MAG per N - COMPARE orders them.
-     * Each target carries its skani numbers against the reference; the reference has none.
+     * Each target carries its skani numbers against the reference and the runs whose reads
+     * were assembled into it: the sample alone in cycle 1, the sample plus the Branchwater
+     * hits in cycle 2. The reference has neither.
      */
+    concatenated_runs = BUILD_CONCAT_DATASETS.out.reads.map { meta, _reads ->
+        [ [meta.sample, "n${meta.n_concat}".toString()], meta.sources.join(',') ]
+    }
+
     comparison_set = GUNZIP_REFERENCE.out.genome
-        .map { meta, fasta -> [ meta + [ani: "NA", af_reference: "NA"], fasta ] }
+        .map { meta, fasta -> [ meta + [ani: "NA", af_reference: "NA", runs: "NA"], fasta ] }
         .mix(
-            cycle1_target.mix( cycle2_target ).map { meta, row, fasta ->
-                [ meta + [ani: row.ani, af_reference: row.af_reference], fasta ]
-            }
+            cycle1_target.map { meta, row, fasta ->
+                [ meta + [ani: row.ani, af_reference: row.af_reference, runs: meta.sample], fasta ]
+            },
+            cycle2_target
+                .map { meta, row, fasta -> [ [meta.sample, meta.source], meta, row, fasta ] }
+                .join( concatenated_runs )
+                .map { _key, meta, row, fasta, runs ->
+                    [ meta + [ani: row.ani, af_reference: row.af_reference, runs: runs], fasta ]
+                }
         )
 
     COMPARE(
@@ -277,7 +289,7 @@ workflow MPP {
         .set { ch_collated_versions }
 
     emit:
-    comparison     = COMPARE.out.metrics   // channel: path(assembly_qc_metrics.tsv)
+    comparison     = COMPARE.out.metrics   // channel: path(output.tsv)
     versions       = ch_collated_versions  // channel: path(versions.yml)
 }
 

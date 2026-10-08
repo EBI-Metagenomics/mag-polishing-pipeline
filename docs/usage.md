@@ -190,7 +190,7 @@ sample produces:
 
 The hits are the same ranked list every time — `n5` is `n1` plus the next four — so the
 depths are nested and the comparison reads as a curve. Each one gets its own row in
-`compare/assembly_qc_metrics.tsv` (`2nd cycle n1`, `2nd cycle n5`, ...), in ascending
+`output.tsv` (`2nd cycle n1`, `2nd cycle n5`, ...), in ascending
 order, after the reference genome and the cycle-1 MAG. That is the whole point: a single value tells you what one
 co-assembly produced, a list tells you whether more data kept helping.
 
