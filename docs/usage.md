@@ -284,8 +284,12 @@ accession.
   completeness and contamination `NA`, and the run continues. It can still be a target
   MAG if it aligns to the reference - selection does not depend on EukCC.
 - **A cycle that recovers no MAG with at least 95% ANI to the reference** is never a
-  failure; it is an `NA` row in `mags/target_mags.tsv` and a shorter comparison set for
-  that sample.
+  failure, but it is logged: a `WARN` names the closest MAG, its ANI and how much of the
+  reference it covers. The cycle is an `NA` row in `mags/target_mags.tsv` and a shorter
+  comparison set for that sample. In cycle 1 it also means no Branchwater search and so no
+  cycle 2 - the reference organism was not recovered as a MAG (a population can drop out at
+  assembly, at binning, or at GGP's completeness >= 50 / contamination <= 5 filter);
+  `--skip_first_assembly` searches with the reference genome instead.
 - **Fewer usable hits than `--n_concat_samples` asks for** is not a failure either. The
   requested depths are capped at what Branchwater delivered and deduplicated, with a
   warning: 3 usable hits and `--n_concat_samples 1,5,10` builds `n1` and `n3`, not three

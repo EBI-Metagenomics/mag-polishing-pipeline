@@ -7,8 +7,10 @@
  * carry several populations of the same genus - SRR26991367 has three under taxid 70447,
  * and picking by taxid + completeness swapped one for another in cycle 2 n1.
  *
- * skani only reports pairs above ~80% ANI, so a candidate with no row did not align at
- * all. `Align_fraction_ref` is the fraction of the reference the candidate covers.
+ * Screening (`-s 0`) and the aligned-fraction floor (`--min-af 0`) are off, so every pair
+ * skani can align is reported, however distant. A candidate with nothing alignable still
+ * gets no row from skani; it is added here with NA, so every MAG of the assembly appears.
+ * `Align_fraction_ref` is the fraction of the reference the candidate covers.
  */
 process SKANI_DIST {
 
@@ -28,9 +30,21 @@ process SKANI_DIST {
     """
     skani dist \\
         -t ${task.cpus} \\
+        -s 0 \\
+        --min-af 0 \\
         -r ${reference} \\
         -q ${candidates} \\
         -o ${prefix}_skani.tsv
+
+    # one NA row, as wide as skani's header, for every candidate skani could not align
+    columns=\$(head -n 1 ${prefix}_skani.tsv | awk -F '\\t' '{ print NF }')
+    for query in ${candidates}; do
+        if ! cut -f 2 ${prefix}_skani.tsv | grep -qxF "\$query"; then
+            awk -v r="${reference}" -v q="\$query" -v n="\$columns" \\
+                'BEGIN { printf "%s\\t%s", r, q; for (i = 3; i <= n; i++) printf "\\tNA"; print "" }' \\
+                >> ${prefix}_skani.tsv
+        fi
+    done
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

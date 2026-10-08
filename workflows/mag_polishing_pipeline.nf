@@ -367,7 +367,7 @@ def source_alignments( genomes, anchors ) {
 /*
  * The hit that is the reference organism: at least `min_ani` ANI, then the one covering
  * most of the reference, then the most complete. 95% ANI is the usual species boundary.
- * null when nothing qualifies - the target MAG is then an NA row, never a failure.
+ * null when nothing qualifies - pick_target then warns, and the target MAG is an NA row.
  */
 def best_match( hits, completeness, min_ani = 95 ) {
     return hits
@@ -386,16 +386,26 @@ def pick_target( skani_hits, taxonomy, genomes ) {
     return skani_hits
         .map { meta, tsv -> [ [meta.sample, meta.source], tsv.splitCsv(header: true, sep: '\t') ] }
         .join( taxonomy.map { meta, row -> [ [meta.sample, meta.source], [meta, row] ] }.groupTuple() )
-        .flatMap { _key, hits, candidates ->
+        .flatMap { key, hits, candidates ->
             // a genome EukCC gave up on has no taxonomy row, and so cannot be a target
             def by_id = candidates.collectEntries { meta, row -> [ (meta.id): [meta, row] ] }
-            def best  = best_match(
-                hits.collect { hit ->
-                    [ genome: genome_name(file(hit.Query_file)), ani: hit.ANI, af_reference: hit.Align_fraction_ref ]
-                }.findAll { by_id.containsKey(it.genome) },
+            def ranked = hits.collect { hit ->
+                [ genome: genome_name(file(hit.Query_file)), ani: hit.ANI, af_reference: hit.Align_fraction_ref ]
+            }
+            def best = best_match(
+                ranked.findAll { by_id.containsKey(it.genome) },
                 by_id.collectEntries { id, entry -> [ (id): entry[1].completeness ] }
             )
             if ( !best ) {
+                def (sample, source) = key
+                def closest = ranked.max { as_number(it.ani) }
+                def nearest = closest && as_number(closest.ani) >= 0
+                    ? "closest is ${closest.genome} at ${closest.ani}% ANI, covering ${closest.af_reference}% of the reference"
+                    : "none of them aligns to it at all"
+                def outcome = source == "cycle1"
+                    ? "No cycle-1 target, so no Branchwater search and no cycle 2 for this sample."
+                    : "No target for ${source}."
+                log.warn "${sample} ${source}: no MAG reaches 95% ANI against the reference (${ranked.size()} compared; ${nearest}). ${outcome}"
                 return []
             }
             def (meta, row) = by_id[best.genome]

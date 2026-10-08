@@ -20,7 +20,8 @@ results/
 ├── taxonomy/eukcc/                         the per-genome EukCC csvs
 ├── mags/all_mags.tsv                       every MAG of both cycles, with its taxid
 ├── mags/skani/<sample>_<cycle1|nN>_skani.tsv  raw `skani dist` of each assembly's MAGs vs the reference
-├── mags/skani_vs_reference.tsv             the same rows, all assemblies: ANI, af_reference, af_genome
+├── mags/skani_vs_reference.tsv             the same rows, all assemblies: ANI, af_reference, af_genome;
+│                                           every MAG, NA when nothing aligns
 ├── mags/target_mags.tsv                    one target MAG per sample and cycle/N: the closest to the
 │                                           reference, NA when none reaches 95% ANI
 └── compare/busco/                          the BUSCO run of every compared genome
