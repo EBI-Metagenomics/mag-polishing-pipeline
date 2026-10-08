@@ -1,0 +1,38 @@
+nextflow_process {
+
+    name "SKANI_DIST"
+    script "../../modules/local/skani_dist/main.nf"
+    process "SKANI_DIST"
+
+    // One assembly's MAGs against the reference. pick_target parses the tsv by column name
+    // and turns Query_file back into the genome id, so both have to survive the staging
+    // into candidates/.
+
+    def FIXTURES = "\${projectDir}/tests/modules/fixtures/skani_dist"
+
+    test("one row per candidate, named so pick_target can recover the genome id") {
+        options "-stub"
+        when {
+            process {
+                """
+                input[0] = [
+                    [id: "SAMPLE_001_n1", sample: "SAMPLE_001", source: "n1"],
+                    file("${FIXTURES}/reference.fa"),
+                    [ file("${FIXTURES}/SAMPLE_001_metabat2_1.fa"), file("${FIXTURES}/SAMPLE_001_metabat2_2.fa") ]
+                ]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def (meta, tsv) = process.out.hits[0]
+            assert meta.source == "n1"
+            assert tsv.endsWith("SAMPLE_001_n1_skani.tsv")
+
+            def lines = path(tsv).readLines()
+            assert lines[0].split('\t')[0..4] == ["Ref_file", "Query_file", "ANI", "Align_fraction_ref", "Align_fraction_query"]
+            assert lines[1..-1].collect { it.split('\t')[1] }.sort() ==
+                ["candidates/SAMPLE_001_metabat2_1.fa", "candidates/SAMPLE_001_metabat2_2.fa"]
+        }
+    }
+}

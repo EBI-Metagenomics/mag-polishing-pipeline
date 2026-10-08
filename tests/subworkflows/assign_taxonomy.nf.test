@@ -16,7 +16,7 @@ nextflow_workflow {
             workflow {
                 """
                 input[0] = channel.of([
-                    [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "reference", slot: "reference"],
+                    [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "reference", source: "reference"],
                     file("\${projectDir}/tests/subworkflows/fixtures/assign_taxonomy/SAMPLE_001.fa")
                 ])
                 """
@@ -43,7 +43,7 @@ nextflow_workflow {
             workflow {
                 """
                 input[0] = channel.of([
-                    [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "cycle1", slot: "cycle1"],
+                    [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "cycle1", source: "cycle1"],
                     file("\${projectDir}/tests/subworkflows/fixtures/assign_taxonomy/SAMPLE_001.fa")
                 ])
                 """

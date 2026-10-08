@@ -15,6 +15,9 @@ include { ASSIGN_TAXONOMY as TAXONOMY_CYCLE2    } from '../subworkflows/local/as
 include { ASSEMBLE_AND_BIN as CYCLE1            } from '../subworkflows/local/assemble_and_bin'
 include { ASSEMBLE_AND_BIN as CYCLE2            } from '../subworkflows/local/assemble_and_bin'
 
+include { SKANI_DIST as SKANI_CYCLE1           } from '../modules/local/skani_dist'
+include { SKANI_DIST as SKANI_CYCLE2           } from '../modules/local/skani_dist'
+
 include { BUILD_CONCAT_DATASETS                 } from '../subworkflows/local/build_concat_datasets'
 include { COMPARE                               } from '../subworkflows/local/compare'
 
@@ -42,35 +45,42 @@ workflow MPP {
     sample_ids = ch_samplesheet.map { meta, _reads, _genome -> meta.id }.collect()
 
     /*
-     * The reference genome: the target taxid, and the run's fail-fast input validation.
+     * The reference genome: what every target MAG is aligned against, and the run's
+     * fail-fast input validation.
      */
     GUNZIP_REFERENCE(
         ch_samplesheet.map { meta, _reads, genome ->
-            [ [id: genome_name(genome), sample: meta.id, origin: "reference", slot: "reference"], genome ]
+            [ [id: genome_name(genome), sample: meta.id, origin: "reference", source: "reference"], genome ]
         }
     )
     TAXONOMY_REFERENCE( GUNZIP_REFERENCE.out.genome )
 
-    target_taxid = TAXONOMY_REFERENCE.out.taxonomy.map { meta, row ->
+    eukaryotic_reference = TAXONOMY_REFERENCE.out.taxonomy.map { meta, row ->
         def lineage = row.ncbi_lng?.trim()
         if ( !lineage || lineage == "NA" || !lineage.tokenize('-').contains("2759") ) {
             error "Reference genome ${meta.id} (sample ${meta.sample}) is not eukaryotic: EukCC lineage '${lineage}'. This pipeline is eukaryote only, see proposal.md section 1."
         }
-        [ meta.sample, row.taxid ]
+        [ meta.sample ]
     }
 
+    // joined on the check above, so no MAG is ever aligned against a reference that failed it
+    anchors = GUNZIP_REFERENCE.out.genome
+        .map { meta, fasta -> [meta.sample, fasta] }
+        .join( eukaryotic_reference )
+
     /*
-     * Cycle 1 - the sample on its own, assembled and binned, and the MAG carrying the
-     * target taxid is what Branchwater then searches with.
+     * Cycle 1 - the sample on its own, assembled and binned, and the MAG closest to the
+     * reference is what Branchwater then searches with.
      *
      * --skip_first_assembly drops that whole cycle and searches with the reference genome
      * from the samplesheet instead. The run is then reference + cycle 2 only: no cycle-1
-     * assembly, no cycle-1 GGP, no `cycle1` slot in any table. Use it when the sample has
+     * assembly, no cycle-1 GGP, no `cycle1` source in any table. Use it when the sample has
      * already been assembled elsewhere, or when the question is only what the public runs
      * add to a genome you already have.
      */
     if ( params.skip_first_assembly ) {
         cycle1_taxonomy = Channel.empty()
+        cycle1_skani    = Channel.empty()
         cycle1_target   = Channel.empty()
         cycle1_versions = Channel.empty()
 
@@ -85,15 +95,18 @@ workflow MPP {
         )
 
         cycle1_genomes = CYCLE1.out.bins.combine( sample_ids.map { [it] } ).map { bin, ids ->
-            [ [id: genome_name(bin), sample: owner_of(bin.name, ids), origin: "cycle1", slot: "cycle1"], bin ]
+            [ [id: genome_name(bin), sample: owner_of(bin.name, ids), origin: "cycle1", source: "cycle1"], bin ]
         }
 
         GUNZIP_CYCLE1( cycle1_genomes )
         TAXONOMY_CYCLE1( GUNZIP_CYCLE1.out.genome )
 
+        SKANI_CYCLE1( source_alignments( GUNZIP_CYCLE1.out.genome, anchors ) )
+
         cycle1_taxonomy = TAXONOMY_CYCLE1.out.taxonomy
-        cycle1_target   = pick_target( cycle1_taxonomy, target_taxid, GUNZIP_CYCLE1.out.genome )
-        cycle1_versions = CYCLE1.out.versions
+        cycle1_skani    = SKANI_CYCLE1.out.hits
+        cycle1_target   = pick_target( cycle1_skani, cycle1_taxonomy, GUNZIP_CYCLE1.out.genome )
+        cycle1_versions = CYCLE1.out.versions.mix( SKANI_CYCLE1.out.versions )
 
         // the compressed bin, not the copy GUNZIP made: sourmash reads gzip natively
         branchwater_query = cycle1_target.map { meta, _row, _fasta -> [meta.id, meta] }
@@ -128,7 +141,7 @@ workflow MPP {
                     id    : genome_name(bin),
                     sample: dataset.replaceFirst(/_n\d+$/, ''),
                     origin: "cycle2",
-                    slot  : "n" + (dataset =~ /_n(\d+)$/)[0][1]
+                    source: "n" + (dataset =~ /_n(\d+)$/)[0][1]
                 ],
                 bin
             ]
@@ -136,7 +149,9 @@ workflow MPP {
     )
     TAXONOMY_CYCLE2( GUNZIP_CYCLE2.out.genome )
 
-    cycle2_target = pick_target( TAXONOMY_CYCLE2.out.taxonomy, target_taxid, GUNZIP_CYCLE2.out.genome, true )
+    SKANI_CYCLE2( source_alignments( GUNZIP_CYCLE2.out.genome, anchors ) )
+
+    cycle2_target = pick_target( SKANI_CYCLE2.out.hits, TAXONOMY_CYCLE2.out.taxonomy, GUNZIP_CYCLE2.out.genome )
 
     /*
      * Tables.
@@ -157,63 +172,77 @@ workflow MPP {
 
     cycle1_taxonomy.mix( TAXONOMY_CYCLE2.out.taxonomy )
         .map { meta, row ->
-            [meta.id, meta.sample, meta.origin, meta.slot, row.taxid, row.completeness, row.contamination].join('\t') + '\n'
+            [meta.id, meta.sample, meta.origin, meta.source, row.taxid, row.completeness, row.contamination].join('\t') + '\n'
         }
         .collectFile(
             name: "all_mags.tsv",
             storeDir: "${params.outdir}/mags",
             sort: true,
-            seed: "genome\tsample\torigin\tslot\ttaxid\tcompleteness\tcontamination\n"
+            seed: "genome\tsample\torigin\tsource\ttaxid\tcompleteness\tcontamination\n"
         )
 
-    // one row per expected slot, NA when the cycle recovered no MAG with the target taxid
+    // every skani row of every MAG, so the choice in target_mags.tsv can be checked
+    cycle1_skani.mix( SKANI_CYCLE2.out.hits )
+        .flatMap { meta, tsv ->
+            tsv.splitCsv(header: true, sep: '\t').collect { hit ->
+                [meta.sample, meta.source, genome_name(file(hit.Query_file)), hit.ANI, hit.Align_fraction_ref, hit.Align_fraction_query].join('\t') + '\n'
+            }
+        }
+        .collectFile(
+            name: "skani_vs_reference.tsv",
+            storeDir: "${params.outdir}/mags",
+            sort: true,
+            seed: "sample\tsource\tgenome\tani\taf_reference\taf_genome\n"
+        )
+
+    // one target MAG per sample and cycle/N, NA when none aligned to the reference
     found_targets = cycle1_target.mix( cycle2_target )
         .map { meta, row, _fasta ->
-            [ "${meta.sample}\t${meta.slot}".toString(), [meta.id, row.taxid, row.completeness, row.contamination] ]
+            [ "${meta.sample}\t${meta.source}".toString(), [meta.id, row.ani, row.af_reference, row.taxid, row.completeness, row.contamination] ]
         }
         .toList()
 
     /*
-     * One row per slot that could be built: cycle 1 for every sample, plus the
+     * One row per source that could be built: cycle 1 for every sample, plus the
      * co-assembly datasets BUILD_CONCAT_DATASETS actually assembled - a sample whose
-     * only Branchwater hit is its own run has no cycle-2 slot at all, and one with fewer
+     * only Branchwater hit is its own run has no cycle-2 source at all, and one with fewer
      * usable hits than --n_concat_samples asks for has its depths capped (it warns).
      */
-    cycle1_slots = params.skip_first_assembly
+    cycle1_sources = params.skip_first_assembly
         ? Channel.empty()
         : ch_samplesheet.map { meta, _reads, _genome -> "${meta.id}\tcycle1".toString() }
 
-    expected_slots = cycle1_slots
+    expected_sources = cycle1_sources
         .mix(
             BUILD_CONCAT_DATASETS.out.reads.map { meta, _reads ->
                 "${meta.sample}\tn${meta.n_concat}".toString()
             }
         )
 
-    expected_slots
+    expected_sources
         .combine( found_targets.map { [it] } )
         .map { key, found ->
-            def values = found.collectEntries()[key] ?: ["NA", "NA", "NA", "NA"]
+            def values = found.collectEntries()[key] ?: ["NA"] * 6
             ([key] + values).join('\t') + '\n'
         }
         .collectFile(
             name: "target_mags.tsv",
             storeDir: "${params.outdir}/mags",
             sort: true,
-            seed: "sample\tslot\tgenome\ttaxid\tcompleteness\tcontamination\n"
+            seed: "sample\tsource\tgenome\tani\taf_reference\ttaxid\tcompleteness\tcontamination\n"
         )
 
     /*
-     * The comparison set: reference, cycle 1, one cycle 2 MAG per N, in that order.
+     * The comparison set: reference, cycle 1, one cycle 2 MAG per N - COMPARE orders them.
+     * Each target carries its skani numbers against the reference; the reference has none.
      */
-    comparison_set = GUNZIP_REFERENCE.out.genome.map { meta, fasta -> [meta.sample, -1, fasta] }
+    comparison_set = GUNZIP_REFERENCE.out.genome
+        .map { meta, fasta -> [ meta + [ani: "NA", af_reference: "NA"], fasta ] }
         .mix(
-            cycle1_target.map { meta, _row, fasta -> [meta.sample, 0, fasta] },
-            cycle2_target.map { meta, _row, fasta -> [meta.sample, meta.slot.substring(1) as int, fasta] }
+            cycle1_target.mix( cycle2_target ).map { meta, row, fasta ->
+                [ meta + [ani: row.ani, af_reference: row.af_reference], fasta ]
+            }
         )
-        .map { sample, rank, fasta -> [sample, [rank, fasta]] }
-        .groupTuple()
-        .map { sample, entries -> [ sample, entries.sort { it[0] }.collect { it[1] } ] }
 
     COMPARE(
         comparison_set,
@@ -226,6 +255,7 @@ workflow MPP {
     ch_versions = ch_versions.mix(
         cycle1_versions,
         CYCLE2.out.versions,
+        SKANI_CYCLE2.out.versions,
         BUILD_CONCAT_DATASETS.out.versions,
     )
 
@@ -308,18 +338,57 @@ def as_number( value ) {
 }
 
 /*
- * The MAGs carrying the sample's target taxid, best completeness first, one per slot
- * (cycle 1 has one slot per sample, cycle 2 one per sample and N).
+ * One SKANI_DIST input per assembly: all of its MAGs against the sample's reference.
+ * Cycle 1 has one assembly per sample, cycle 2 one per sample and N.
  */
-def pick_target( taxonomy, target_taxid, genomes, per_slot = false ) {
-    return taxonomy
-        .map { meta, row -> [meta.sample, meta, row] }
-        .combine( target_taxid, by: 0 )
-        .filter { _sample, _meta, row, taxid -> row.taxid != "NA" && row.taxid == taxid }
-        .map { sample, meta, row, _taxid -> [ per_slot ? "${sample}\t${meta.slot}".toString() : sample, [meta, row] ] }
+def source_alignments( genomes, anchors ) {
+    return genomes
+        .map { meta, fasta -> [ [meta.sample, meta.source], fasta ] }
         .groupTuple()
-        .map { _key, candidates -> candidates.max { as_number(it[1].completeness) } }
-        .map { meta, row -> [meta.id, meta, row] }
+        .map { key, fastas -> [ key[0], key[1], fastas ] }
+        .combine( anchors, by: 0 )
+        .map { sample, source, fastas, reference ->
+            [ [id: "${sample}_${source}".toString(), sample: sample, source: source], reference, fastas ]
+        }
+}
+
+/*
+ * The hit that is the reference organism: at least `min_ani` ANI, then the one covering
+ * most of the reference, then the most complete. 95% ANI is the usual species boundary.
+ * null when nothing qualifies - the target MAG is then an NA row, never a failure.
+ */
+def best_match( hits, completeness, min_ani = 95 ) {
+    return hits
+        .findAll { as_number(it.ani) >= min_ani }
+        .max { a, b ->
+            as_number(a.af_reference) <=> as_number(b.af_reference) ?:
+                as_number(completeness[a.genome]) <=> as_number(completeness[b.genome])
+        }
+}
+
+/*
+ * The MAG closest to the reference, one per sample and cycle/N, as [meta, taxonomy row + ani/af_reference, fasta].
+ * The EukCC taxid stays in the row as information only; it no longer decides anything.
+ */
+def pick_target( skani_hits, taxonomy, genomes ) {
+    return skani_hits
+        .map { meta, tsv -> [ [meta.sample, meta.source], tsv.splitCsv(header: true, sep: '\t') ] }
+        .join( taxonomy.map { meta, row -> [ [meta.sample, meta.source], [meta, row] ] }.groupTuple() )
+        .flatMap { _key, hits, candidates ->
+            // a genome EukCC gave up on has no taxonomy row, and so cannot be a target
+            def by_id = candidates.collectEntries { meta, row -> [ (meta.id): [meta, row] ] }
+            def best  = best_match(
+                hits.collect { hit ->
+                    [ genome: genome_name(file(hit.Query_file)), ani: hit.ANI, af_reference: hit.Align_fraction_ref ]
+                }.findAll { by_id.containsKey(it.genome) },
+                by_id.collectEntries { id, entry -> [ (id): entry[1].completeness ] }
+            )
+            if ( !best ) {
+                return []
+            }
+            def (meta, row) = by_id[best.genome]
+            [ [ meta.id, meta, row + [ani: best.ani, af_reference: best.af_reference] ] ]
+        }
         .join( genomes.map { meta, fasta -> [meta.id, fasta] } )
         .map { _id, meta, row, fasta -> [meta, row, fasta] }
 }

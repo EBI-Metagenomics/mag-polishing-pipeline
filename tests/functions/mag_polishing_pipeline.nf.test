@@ -33,6 +33,60 @@ nextflow_function {
         then { assert function.failed }
     }
 
+    // best_match: the SRR26991367 n1 MAG, where the taxid pick chose a bin of another
+    // population (123, no skani hit) over the one that aligns to the reference (178)
+
+    test("best_match takes the bin covering most of the reference, not the most complete") {
+        function "best_match"
+        when { function { """
+            input[0] = [
+                [genome: "n1_metabat2_178", ani: "99.72", af_reference: "81.40"],
+                [genome: "n1_metabat2_999", ani: "99.10", af_reference: "12.00"]
+            ]
+            input[1] = ["n1_metabat2_178": "59.4", "n1_metabat2_999": "92.0"]
+        """ } }
+        then { assert function.success; assert function.result.genome == "n1_metabat2_178" }
+    }
+
+    test("best_match drops hits under 95% ANI however much they cover") {
+        function "best_match"
+        when { function { """
+            input[0] = [
+                [genome: "same_genus", ani: "91.50", af_reference: "95.00"],
+                [genome: "same_species", ani: "99.70", af_reference: "40.00"]
+            ]
+            input[1] = [:]
+        """ } }
+        then { assert function.result.genome == "same_species" }
+    }
+
+    test("best_match breaks an aligned-fraction tie on completeness") {
+        function "best_match"
+        when { function { """
+            input[0] = [
+                [genome: "a", ani: "99.0", af_reference: "80.0"],
+                [genome: "b", ani: "98.0", af_reference: "80.0"]
+            ]
+            input[1] = [a: "60.0", b: "70.0"]
+        """ } }
+        then { assert function.result.genome == "b" }
+    }
+
+    test("best_match returns null when nothing is the reference organism") {
+        function "best_match"
+        when { function { """
+            input[0] = [ [genome: "a", ani: "85.0", af_reference: "70.0"] ]
+            input[1] = [a: "90.0"]
+        """ } }
+        then { assert function.success; assert function.result == null }
+    }
+
+    test("best_match returns null when no MAG has a skani hit at all") {
+        function "best_match"
+        when { function { """ input[0] = []; input[1] = [:] """ } }
+        then { assert function.success; assert function.result == null }
+    }
+
     def VERSIONS = "\${projectDir}/tests/functions/fixtures/versions"
 
     test("a well formed versions.yml is kept") {

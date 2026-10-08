@@ -111,7 +111,7 @@ graph LR
 %%metro off_track: sheet, qc, tabs
 
 %%metro group: sample, fastq_1, fastq_2, genome - sample id >= 7 chars | refgz | below
-%%metro group: pick_target, one per slot (n) | pick2 | below
+%%metro group: pick_target, one per source (n) | pick2 | below
 %%metro group: must descend from 2759 (Eukaryota) or the run aborts | taxid | above
 %%metro group: --skip_prok; take bins (per-run derep, QS50), not mags | ggp1 | above
 %%metro group: pick_target: taxid == reference, best completeness | eukcc1, pick1 | below

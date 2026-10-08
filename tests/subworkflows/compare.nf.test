@@ -4,30 +4,48 @@ nextflow_workflow {
     script "../../subworkflows/local/compare/main.nf"
     workflow "COMPARE"
 
-    // The deliverable. Every metric is keyed back to the genome basename, and each cell
-    // holds one value per genome, "/" separated, in the order the comparison set was
-    // built (reference -> cycle 1 -> ascending N).
+    // The deliverable: one row per genome, every metric keyed back to the genome basename,
+    // ordered reference -> 1st cycle -> ascending N whatever order the genomes arrive in.
 
     def FIXTURES = "\${projectDir}/tests/subworkflows/fixtures/compare"
 
-    test("one row per sample, with the metrics joined by basename") {
+    test("one row per genome, ordered by source, with BUSCO, EukCC and skani") {
         options "-stub"
         when {
             params { busco_db = "${projectDir}"; busco_mode = "genome" }
             workflow {
                 """
-                input[0] = channel.of([ "SAMPLE_001", [ file("${FIXTURES}/SAMPLE_001.fa") ] ])
-                input[1] = channel.of([ "SAMPLE_001", [completeness: "90.0", contamination: "1.0"] ])
+                input[0] = channel.of(
+                    [ [sample: "SAMPLE_001", source: "n5", ani: "99.10", af_reference: "90.0"], file("${FIXTURES}/SAMPLE_001_n5_metabat2_2.fa") ],
+                    [ [sample: "SAMPLE_001", source: "cycle1", ani: "99.80", af_reference: "84.4"], file("${FIXTURES}/SAMPLE_001.fa") ],
+                    [ [sample: "SAMPLE_001", source: "reference", ani: "NA", af_reference: "NA"], file("${FIXTURES}/REF_001.fa") ],
+                    [ [sample: "SAMPLE_001", source: "n1", ani: "99.72", af_reference: "81.4"], file("${FIXTURES}/SAMPLE_001_n1_metabat2_1.fa") ]
+                )
+                input[1] = channel.of(
+                    [ "SAMPLE_001", [completeness: "66.0", contamination: "1.8"] ],
+                    [ "REF_001", [completeness: "39.6", contamination: "0.4"] ]
+                )
                 """
             }
         }
         then {
             assert workflow.success
-            def lines = path(workflow.out.metrics[0]).text.readLines()
-            assert lines[0] == "sample\tassembly\tlength\tn50\tgc_content\tn_contigs\tbusco\teukcc_completeness\teukcc_contamination"
-            assert lines[1].startsWith("SAMPLE_001\tSAMPLE_001.fa")
-            assert lines[1].contains("90.0"), lines[1]
-            assert lines[1].contains("1.0"), lines[1]
+            def rows = path(workflow.out.metrics[0]).text.readLines()*.split('\t')
+            assert rows[0] == [
+                "sample", "assembly", "source", "length", "n50", "gc_content", "n_contigs",
+                "eukcc_completeness", "eukcc_contamination", "busco", "ani_reference", "af_reference"
+            ]
+            assert rows[1..-1].collect { it[1] } == ["REF_001.fa", "SAMPLE_001.fa", "SAMPLE_001_n1_metabat2_1.fa", "SAMPLE_001_n5_metabat2_2.fa"]
+            assert rows[1..-1].collect { it[2] } == ["reference", "1st cycle", "2nd cycle n1", "2nd cycle n5"]
+
+            def cycle1 = rows[2]
+            assert cycle1[3..6] == ["1000", "500", "50.0", "10"]     // CALCULATE_ASSEMBLY_STATS stub
+            assert cycle1[7..8] == ["66.0", "1.8"]
+            assert cycle1[9].startsWith("C:90.0%")                 // BUSCO stub
+            assert cycle1[10..11] == ["99.80", "84.4"]
+
+            assert rows[1][10..11] == ["NA", "NA"]                  // the reference has no skani row
+            assert rows[3][7..8] == ["NA", "NA"]                    // no EukCC row for this genome
         }
     }
 
@@ -38,8 +56,8 @@ nextflow_workflow {
             workflow {
                 """
                 input[0] = channel.of(
-                    [ "SAMPLE_001", [ file("${FIXTURES}/SAMPLE_001.fa") ] ],
-                    [ "SAMPLE_002", [ file("${FIXTURES}/SAMPLE_001.fa") ] ]
+                    [ [sample: "SAMPLE_001", source: "cycle1", ani: "NA", af_reference: "NA"], file("${FIXTURES}/SAMPLE_001.fa") ],
+                    [ [sample: "SAMPLE_002", source: "cycle1", ani: "NA", af_reference: "NA"], file("${FIXTURES}/SAMPLE_001.fa") ]
                 )
                 input[1] = channel.of([ "SAMPLE_001", [completeness: "90.0", contamination: "1.0"] ])
                 """

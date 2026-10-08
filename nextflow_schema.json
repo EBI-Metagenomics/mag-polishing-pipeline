@@ -59,7 +59,7 @@
                 "skip_first_assembly": {
                     "type": "boolean",
                     "description": "Skip cycle 1 entirely and search Branchwater with the samplesheet genome.",
-                    "help_text": "No cycle-1 assembly, no cycle-1 GGP and no `cycle1` slot in any table. Use it when the sample has already been assembled elsewhere, or when the question is only what the public runs add to a genome you already have.",
+                    "help_text": "No cycle-1 assembly, no cycle-1 GGP and no `cycle1` source in any table. Use it when the sample has already been assembled elsewhere, or when the question is only what the public runs add to a genome you already have.",
                     "fa_icon": "fas fa-forward"
                 },
                 "ena_cache_dir": {
@@ -121,7 +121,7 @@
                     "description": "Assembler for both cycles.",
                     "enum": ["metaspades", "megahit"],
                     "fa_icon": "fas fa-cogs",
-                    "help_text": "metaSPAdes is the default. megahit is the escape hatch for cycle-2 datasets too deep to assemble in the available memory: a fraction of the memory and time, at the cost of a more fragmented assembly. Every slot in a run uses the same assembler, so the comparison stays internally consistent."
+                    "help_text": "metaSPAdes is the default. megahit is the escape hatch for cycle-2 datasets too deep to assemble in the available memory: a fraction of the memory and time, at the cost of a more fragmented assembly. Every assembly in a run uses the same assembler, so the comparison stays internally consistent."
                 },
                 "assembly_memory": {
                     "type": "integer",

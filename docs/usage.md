@@ -61,7 +61,7 @@ are in [Inert params](#inert-params) at the end.
 | ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--input`               | —           | required, see [Input](#input)                                                                                                                                         |
 | `--n_concat_samples`    | `1,5,10`    | comma separated; one co-assembly dataset per value, capped at the number of usable Branchwater hits. See [Co-assembly depths](#co-assembly-depths---n_concat_samples) |
-| `--skip_first_assembly` | `false`     | skip cycle 1 entirely and search Branchwater with the samplesheet genome; no cycle-1 assembly, no cycle-1 GGP, no `cycle1` slot in any table                          |
+| `--skip_first_assembly` | `false`     | skip cycle 1 entirely and search Branchwater with the samplesheet genome; no cycle-1 assembly, no cycle-1 GGP, no `cycle1` source in any table                        |
 | `--outdir`              | `results`   |                                                                                                                                                                       |
 | `--ena_cache_dir`       | `ena_cache` | shared fastq cache (`storeDir`); every run accession is downloaded once, across samples and N values. Expect hundreds of GB                                           |
 | `--publish_dir_mode`    | `copy`      | any Nextflow `publishDir` mode; `symlink` saves space but breaks once `work/` is deleted                                                                              |
@@ -189,9 +189,9 @@ sample produces:
 | `10`  | sample reads + the top-10 hits           | `<sample>_n10` |
 
 The hits are the same ranked list every time — `n5` is `n1` plus the next four — so the
-depths are nested and the comparison reads as a curve. Each one lands in its own column
-slot of `compare/assembly_qc_metrics.tsv`, in ascending order, next to the reference
-genome and the cycle-1 MAG. That is the whole point: a single value tells you what one
+depths are nested and the comparison reads as a curve. Each one gets its own row in
+`compare/assembly_qc_metrics.tsv` (`2nd cycle n1`, `2nd cycle n5`, ...), in ascending
+order, after the reference genome and the cycle-1 MAG. That is the whole point: a single value tells you what one
 co-assembly produced, a list tells you whether more data kept helping.
 
 Example of logics:
@@ -280,11 +280,12 @@ accession.
 - **Sample ids under 7 characters** abort the run with an explicit message.
 - **Genome file names must be unique** across a comparison — every metric is keyed back to
   the basename.
-- **EukCC exits 201 when it finds no marker genes.** Tolerated: the genome gets taxid `NA`,
-  matches nothing, and the run continues. The slot is reported as `NA` in
-  `mags/target_mags.tsv`.
-- **A cycle that recovers no MAG with the target taxid** is never a failure; it is an `NA`
-  row and a shorter comparison set for that sample.
+- **EukCC exits 201 when it finds no marker genes.** Tolerated: the genome gets taxid,
+  completeness and contamination `NA`, and the run continues. It can still be a target
+  MAG if it aligns to the reference - selection does not depend on EukCC.
+- **A cycle that recovers no MAG with at least 95% ANI to the reference** is never a
+  failure; it is an `NA` row in `mags/target_mags.tsv` and a shorter comparison set for
+  that sample.
 - **Fewer usable hits than `--n_concat_samples` asks for** is not a failure either. The
   requested depths are capped at what Branchwater delivered and deduplicated, with a
   warning: 3 usable hits and `--n_concat_samples 1,5,10` builds `n1` and `n3`, not three

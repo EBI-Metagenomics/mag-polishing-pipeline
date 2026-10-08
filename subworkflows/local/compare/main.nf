@@ -1,5 +1,6 @@
 /*
- * The comparison table: the reference genome against the MAG each cycle recovered.
+ * The comparison table: the reference genome against the MAG each cycle recovered, one
+ * row per genome.
  *
  * EukCC is taken as an input rather than run here, because assign_taxonomy.nf already
  * runs it on every genome in the experiment to assign the taxid - one EukCC run per
@@ -13,11 +14,11 @@ include { COLLECT_ASSEMBLIES       } from '../../../modules/local/collect_assemb
 workflow COMPARE {
 
     take:
-    samples     // channel: [ val(sample), [ path(fasta), ... ] ]
+    genomes     // channel: [ val(meta), path(fasta) ]  meta: sample, source (reference | cycle1 | nN), ani, af_reference
     eukcc_rows  // channel: [ val(genome), [completeness: .., contamination: ..] ]  genome == fasta.baseName
 
     main:
-    assemblies = samples.flatMap { _sample, fastas -> fastas }
+    assemblies = genomes.map { _meta, fasta -> fasta }
 
     // every metric is keyed back to the assembly basename, so they have to be unique
     assemblies.map { it.baseName }.toList().subscribe { names ->
@@ -46,12 +47,12 @@ workflow COMPARE {
         .map { row -> [row.Genome, row] }
 
     header = [
-        "sample", "assembly", "length", "n50", "gc_content", "n_contigs",
-        "busco", "eukcc_completeness", "eukcc_contamination"
+        "sample", "assembly", "source", "length", "n50", "gc_content", "n_contigs",
+        "eukcc_completeness", "eukcc_contamination", "busco", "ani_reference", "af_reference"
     ]
 
     // each side is wrapped in a list because combine() spreads list items into the tuple
-    metrics = samples.toList().map { [it] }
+    metrics = genomes.toList().map { [it] }
         .combine( busco_scores.toList().map { [it] } )
         .combine( eukcc_rows.toList().map { [it] } )
         .combine( assembly_stats.toList().map { [it] } )
@@ -59,19 +60,25 @@ workflow COMPARE {
             def busco = busco_list.collectEntries()
             def eukcc = eukcc_list.collectEntries()
             def stats = stats_list.collectEntries()
-            def lines = rows.collect { sample, fastas ->
-                [
-                    sample,
-                    cell( fastas.collect { it.name } ),
-                    cell( fastas.collect { stats[it.baseName]?.Length } ),
-                    cell( fastas.collect { stats[it.baseName]?.N50 } ),
-                    cell( fastas.collect { stats[it.baseName]?.GC_content } ),
-                    cell( fastas.collect { stats[it.baseName]?.N_contigs } ),
-                    cell( fastas.collect { busco[it.baseName] } ),
-                    cell( fastas.collect { eukcc[it.baseName]?.completeness } ),
-                    cell( fastas.collect { eukcc[it.baseName]?.contamination } )
-                ].join('\t')
-            }
+            def lines = rows
+                .sort { a, b -> a[0].sample <=> b[0].sample ?: source_rank(a[0].source) <=> source_rank(b[0].source) }
+                .collect { meta, fasta ->
+                    def name = fasta.baseName
+                    [
+                        meta.sample,
+                        fasta.name,
+                        source_label(meta.source),
+                        stats[name]?.Length,
+                        stats[name]?.N50,
+                        stats[name]?.GC_content,
+                        stats[name]?.N_contigs,
+                        eukcc[name]?.completeness,
+                        eukcc[name]?.contamination,
+                        busco[name],
+                        meta.ani,
+                        meta.af_reference
+                    ].collect { it ?: "NA" }.join('\t')
+                }
             ([header.join('\t')] + lines).join('\n') + '\n'
         }
         .collectFile(name: "assembly_qc_metrics.tsv", storeDir: "${params.outdir}/compare")
@@ -80,7 +87,12 @@ workflow COMPARE {
     metrics = metrics
 }
 
-// one value per assembly, "/" separated, in the order the comparison set was built
-def cell(values) {
-    values.collect { it ?: "NA" }.join("/")
+// reference first, then cycle 1, then the cycle-2 depths in ascending N
+def source_rank( source ) {
+    source == "reference" ? -1 : source == "cycle1" ? 0 : source.substring(1) as int
+}
+
+// "reference" -> "reference", "cycle1" -> "1st cycle", "n5" -> "2nd cycle n5"
+def source_label( source ) {
+    source == "reference" ? "reference" : source == "cycle1" ? "1st cycle" : "2nd cycle ${source}".toString()
 }
