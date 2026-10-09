@@ -1,0 +1,1 @@
+../pipelines/genomes-generation/bin/logging_stats.py

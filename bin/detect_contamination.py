@@ -1,0 +1,1 @@
+../pipelines/genomes-generation/bin/detect_contamination.py

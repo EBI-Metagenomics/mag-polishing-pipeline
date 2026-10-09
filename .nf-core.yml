@@ -1,0 +1,67 @@
+repository_type: pipeline
+
+nf_core_version: 3.2.0
+
+org_path: ebi-metagenomics
+
+template:
+  org: EBI-Metagenomics
+  name: mag-polishing-pipeline
+  description: Improves MAG quality by recruiting additional related samples through
+    sequence similarity search
+  author: Microbiome Informatics Team - EMBL-EBI
+  version: 0.1.0
+  is_nfcore: false
+
+lint:
+  # This pipeline is an orchestrator: it composes miassembler and genomes-generation as
+  # git submodules under pipelines/, pinned by tag, and its own Branchwater and compare
+  # subworkflows. That is what the exceptions below are about - see CLAUDE.md.
+  files_exist:
+    - CODE_OF_CONDUCT.md
+    - assets/nf-core-mag-polishing-pipeline_logo_light.png
+    - docs/images/nf-core-mag-polishing-pipeline_logo_light.png
+    - docs/images/nf-core-mag-polishing-pipeline_logo_dark.png
+    - .github/ISSUE_TEMPLATE/config.yml
+    - .github/workflows/awstest.yml
+    - .github/workflows/awsfulltest.yml
+    # The EBI house layout is two workflows, linting.yml and nf_tests.yml, same as
+    # EBI-Metagenomics/miassembler. The template's branch/ci/linting_comment workflows are
+    # deliberately not here: nf_tests.yml does the testing, and there is no dev/master
+    # branch protection flow to police.
+    - .github/workflows/branch.yml
+    - .github/workflows/ci.yml
+    - .github/workflows/linting_comment.yml
+    - conf/igenomes.config
+    - conf/igenomes_ignored.config
+  files_unchanged:
+    - CODE_OF_CONDUCT.md
+    - assets/nf-core-mag-polishing-pipeline_logo_light.png
+    - docs/images/nf-core-mag-polishing-pipeline_logo_light.png
+    - docs/images/nf-core-mag-polishing-pipeline_logo_dark.png
+    - .github/ISSUE_TEMPLATE/bug_report.yml
+    - .github/CONTRIBUTING.md
+    - .github/PULL_REQUEST_TEMPLATE.md
+    - assets/email_template.txt
+    - docs/README.md
+    - .gitignore
+    # Nextflow is pinned to 24.04.3 in this workflow instead of `latest`: nf-core lint
+    # shells out to `nextflow config`, and the strict parser in Nextflow 25+ rejects the
+    # study_reads_folder() helpers that miassembler's publishDir closures need.
+    - .github/workflows/linting.yml
+  nextflow_config:
+    - manifest.name
+    - manifest.homePage
+    - validation.help.beforeText
+    - validation.help.afterText
+    - validation.summary.beforeText
+    - validation.summary.afterText
+    # the two upstream pipelines are composed, not vendored, so their params land here
+    - params.custom_config_version
+    - params.custom_config_base
+  multiqc_config:
+    - report_comment
+  # The composed pipelines live under pipelines/ as git submodules, and the linter walks
+  # into them. genomes-generation still imports the older nf-validation plugin, which is
+  # its business, not ours - we pin nf-schema for the composing runtime.
+  plugin_includes: false
