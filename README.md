@@ -28,10 +28,11 @@ Each sample (paired-end reads plus a MAG, referred here as reference genome) goe
 
 With `--skip_first_assembly`, `Cycle 1` is dropped: Branchwater is searched with the reference genome, and the comparison is reference vs `Cycle 2` only. See [`--skip_first_assembly`](docs/usage.md#pipeline) and [`--n_concat_samples`](docs/usage.md#co-assembly-depths---n_concat_samples) in the usage documentation.
 
-> [!NOTE] > `--n_concat_samples` accepts comma-separated values, e.g. `--n_concat_samples 1,2,3`. The aim is to
+> [!NOTE]
+> The `--n_concat_samples` parameter accepts comma-separated values, e.g. `--n_concat_samples 1,2,3`. The aim is to
 > benchmark how many additional samples are, in general, needed to improve a MAG. This logic is a temporary
-> feature and is storage-hungry, considering that each value on `--n_concat_samples` will generate a new
-> pair of fastq files and all the intermediate files generated during miassembler and GPP subworkflows.
+> feature and is storage-hungry, considering that each value of `--n_concat_samples` generates a new
+> pair of fastq files and all the intermediate files of the miassembler and GGP subworkflows.
 
 ### Features
 
