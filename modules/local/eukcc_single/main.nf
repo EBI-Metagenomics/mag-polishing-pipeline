@@ -1,12 +1,3 @@
-/*
- * `eukcc single` on one genome.
- *
- * One run serves two purposes (proposal.md section 5): completeness/contamination for the
- * comparison table, and `ncbi_lng` - a dash separated chain of NCBI taxids whose last
- * element is the assigned taxid - for the "same organism" match. Named EUKCC_SINGLE and
- * not EUKCC because genomes-generation ships its own EUKCC process whose config selector
- * would otherwise apply to this one.
- */
 process EUKCC_SINGLE {
 
     container 'community.wave.seqera.io/library/python_metaeuk_pplacer_epa-ng_pruned:0b7ea587ebcad440'

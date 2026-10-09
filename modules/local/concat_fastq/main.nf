@@ -3,7 +3,7 @@
  *
  * Plain `cat` of the gzip members: valid gzip, and metaSPAdes tolerates the duplicated
  * read names across runs. If GGP's back-mapping ever misbehaves, prefix the read names
- * with the run accession here (proposal.md section 9).
+ * with the run accession here.
  */
 process CONCAT_FASTQ {
 
