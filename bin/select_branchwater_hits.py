@@ -94,7 +94,7 @@ def ena_read_run(accession):
     try:
         with urllib.request.urlopen(f"{ENA_PORTAL}?{query}", timeout=60) as response:
             records = json.load(response)
-    except Exception as error:  # noqa: BLE001 - an unavailable run is not a failure
+    except Exception as error:
         print(f"{accession}: ENA lookup failed ({error})", file=sys.stderr)
         return None
 

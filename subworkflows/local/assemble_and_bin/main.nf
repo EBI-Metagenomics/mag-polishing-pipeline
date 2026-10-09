@@ -6,7 +6,7 @@
  *
  * `bins` and not `mags`: GGP's `mags` are dereplicated across everything in the same run,
  * so in cycle 2 the n=1 / n=5 / n=10 genomes of one organism would collapse into a single
- * representative and the comparison would lose its slots. `bins` are the per-run
+ * representative and the comparison would lose its sources. `bins` are the per-run
  * dereplicated, QS50 filtered genomes - one set per dataset, which is the unit this
  * experiment compares.
  */

@@ -2,7 +2,7 @@
  * One run accession -> its two fastqs, md5 verified.
  *
  * storeDir is the whole caching story: a run picked for several samples, or for several
- * --n_concat_samples values, is downloaded once (proposal.md section 9, download volume).
+ * --n_concat_samples values, is downloaded once.
  */
 process ENA_FETCH_FASTQ {
 

@@ -9,8 +9,9 @@ top-level results directory given by `--outdir`.
 
 ```
 results/
-├── MAGCYC1/MAGCYC1/<7 chars>/<sample>/     cycle 1 assembly + QC (miassembler layout)
-├── MAGCYC2/MAGCYC2/<7 chars>/<dataset>/    cycle 2, one dataset per sample and N
+├── output.tsv                              the deliverable: one row per compared genome, below
+├── MAGCYC1/<7 chars>/<sample>/             cycle 1 assembly + QC (miassembler layout)
+├── MAGCYC2/<7 chars>/<dataset>/            cycle 2, one dataset per sample and N
 ├── eukaryotes/{bins,mags}/                 GGP genomes, both cycles (names carry the
 │                                           dataset id)
 ├── branchwater/<mag>/                      hits csv, metadata csv, selected runs csv
@@ -18,15 +19,36 @@ results/
 ├── taxonomy/eukcc_taxonomy.tsv             every genome: taxid, lineage, completeness, contamination
 ├── taxonomy/eukcc/                         the per-genome EukCC csvs
 ├── mags/all_mags.tsv                       every MAG of both cycles, with its taxid
-├── mags/target_mags.tsv                    one row per expected slot, NA when nothing matched
-└── compare/assembly_qc_metrics.tsv         comparative metrics: length, N50, GC, contigs, BUSCO, EukCC
+├── mags/skani/<sample>_<cycle1|nN>_skani.tsv  raw `skani dist` of each assembly's MAGs vs the reference
+├── mags/skani_vs_reference.tsv             the same rows, all assemblies: ANI, af_reference, af_genome;
+│                                           every MAG, NA when nothing aligns
+├── mags/target_mags.tsv                    one target MAG per sample and cycle/N: the closest to the
+│                                           reference, NA when none reaches 95% ANI
+└── compare/busco/                          the BUSCO run of every compared genome
 ```
 
-In `assembly_qc_metrics.tsv` each cell holds one value per genome, `/` separated, in the
-order reference → cycle 1 → ascending N; the `assembly` column names them. With
-`--skip_first_assembly` the cycle-1 value is not `NA`, it is absent — no `MAGCYC1/`
-directory, no `cycle1` row in `all_mags.tsv` or `target_mags.tsv`, and one fewer value in
-every cell.
+`output.tsv` has one row per genome, ordered reference → 1st cycle → ascending N within
+each sample:
+
+| sample      | assembly                       | source       | concatenated_runs                  |   length |   n50 | gc_content | n_contigs | eukcc_completeness | eukcc_contamination | busco                  | ani_reference | af_reference |
+| ----------- | ------------------------------ | ------------ | ---------------------------------- | -------: | ----: | ---------: | --------: | -----------------: | ------------------: | ---------------------- | ------------: | -----------: |
+| SRR26991367 | GCA\_...\_genomic.fa           | reference    | NA                                 |  5021104 |  6519 |      62.14 |       910 |               39.6 |                 0.4 | `C:39.0%[S:38.3%,...]` |            NA |           NA |
+| SRR26991367 | SRR26991367_metabat2_68.fa     | 1st cycle    | NA                                 |  8334660 | 11202 |      61.73 |      1058 |               66.0 |                 1.8 | `C:65.1%[S:63.4%,...]` |         99.80 |         84.4 |
+| SRR26991367 | SRR26991367_n2_metabat2_181.fa | 2nd cycle n2 | SRR26991367,SRR18697550,SRR6978757 | 11555297 | 18037 |       60.8 |       993 |               92.6 |                 0.4 | `C:89.8%[S:89.3%,...]` |         99.69 |         90.4 |
+
+`concatenated_runs` are the runs concatenated into a cycle-2 dataset: the sample plus the
+Branchwater hits it was co-assembled with (the same list as
+`concat_datasets/<sample>_nN/*_provenance.tsv`). The reference and the 1st cycle have `NA`,
+since cycle 1 assembles only the samplesheet reads. `ani_reference` and `af_reference` are
+skani's ANI and the fraction of the reference the MAG covers, the numbers that made it the
+target; the reference has `NA` in both. With
+`--skip_first_assembly` there is no `1st cycle` row at all, no `MAGCYC1/` directory, and
+no `cycle1` row in `all_mags.tsv` or `target_mags.tsv`.
+
+Each target MAG is the one that **aligns to the reference**, not the one that shares its
+EukCC taxid: at least 95% ANI (skani), then the largest fraction of the reference covered
+(`af_reference`), then completeness. EukCC often stops at genus, and one sample can hold
+several populations of that genus. `taxid` is still reported, as information only.
 
 ## Pipeline information
 

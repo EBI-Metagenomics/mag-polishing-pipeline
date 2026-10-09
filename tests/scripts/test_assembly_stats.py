@@ -1,7 +1,7 @@
 """Unit tests for bin/assembly_stats.py and bin/precompute_assembly_stats.py.
 
 These two produce the length / N50 / GC / contig-count columns of
-`compare/assembly_qc_metrics.tsv`, which is the pipeline's deliverable, so the arithmetic
+`output.tsv`, which is the pipeline's deliverable, so the arithmetic
 is worth pinning down.
 """
 
