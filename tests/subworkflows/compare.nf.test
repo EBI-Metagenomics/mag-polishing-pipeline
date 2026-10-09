@@ -17,7 +17,7 @@ nextflow_workflow {
                 """
                 input[0] = channel.of(
                     [ [sample: "SAMPLE_001", source: "n5", runs: "SAMPLE_001,SRR1,SRR2,SRR3,SRR4,SRR5", ani: "99.10", af_reference: "90.0"], file("${FIXTURES}/SAMPLE_001_n5_metabat2_2.fa") ],
-                    [ [sample: "SAMPLE_001", source: "cycle1", runs: "SAMPLE_001", ani: "99.80", af_reference: "84.4"], file("${FIXTURES}/SAMPLE_001.fa") ],
+                    [ [sample: "SAMPLE_001", source: "cycle1", runs: "NA", ani: "99.80", af_reference: "84.4"], file("${FIXTURES}/SAMPLE_001.fa") ],
                     [ [sample: "SAMPLE_001", source: "reference", runs: "NA", ani: "NA", af_reference: "NA"], file("${FIXTURES}/REF_001.fa") ],
                     [ [sample: "SAMPLE_001", source: "n1", runs: "SAMPLE_001,SRR1", ani: "99.72", af_reference: "81.4"], file("${FIXTURES}/SAMPLE_001_n1_metabat2_1.fa") ]
                 )
@@ -37,7 +37,7 @@ nextflow_workflow {
             ]
             assert rows[1..-1].collect { it[1] } == ["REF_001.fa", "SAMPLE_001.fa", "SAMPLE_001_n1_metabat2_1.fa", "SAMPLE_001_n5_metabat2_2.fa"]
             assert rows[1..-1].collect { it[2] } == ["reference", "1st cycle", "2nd cycle n1", "2nd cycle n5"]
-            assert rows[1..-1].collect { it[3] } == ["NA", "SAMPLE_001", "SAMPLE_001,SRR1", "SAMPLE_001,SRR1,SRR2,SRR3,SRR4,SRR5"]
+            assert rows[1..-1].collect { it[3] } == ["NA", "NA", "SAMPLE_001,SRR1", "SAMPLE_001,SRR1,SRR2,SRR3,SRR4,SRR5"]
             assert workflow.out.metrics[0].endsWith("output.tsv")
 
             def cycle1 = rows[2]

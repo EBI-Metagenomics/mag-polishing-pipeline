@@ -234,9 +234,9 @@ workflow MPP {
 
     /*
      * The comparison set: reference, cycle 1, one cycle 2 MAG per N - COMPARE orders them.
-     * Each target carries its skani numbers against the reference and the runs whose reads
-     * were assembled into it: the sample alone in cycle 1, the sample plus the Branchwater
-     * hits in cycle 2. The reference has neither.
+     * Each target carries its skani numbers against the reference and, in cycle 2, the runs
+     * concatenated into its dataset: the sample plus the Branchwater hits. Cycle 1 assembles
+     * the samplesheet reads alone, so it has no concatenated runs; the reference has neither.
      */
     concatenated_runs = BUILD_CONCAT_DATASETS.out.reads.map { meta, _reads ->
         [ [meta.sample, "n${meta.n_concat}".toString()], meta.sources.join(',') ]
@@ -246,7 +246,7 @@ workflow MPP {
         .map { meta, fasta -> [ meta + [ani: "NA", af_reference: "NA", runs: "NA"], fasta ] }
         .mix(
             cycle1_target.map { meta, row, fasta ->
-                [ meta + [ani: row.ani, af_reference: row.af_reference, runs: meta.sample], fasta ]
+                [ meta + [ani: row.ani, af_reference: row.af_reference, runs: "NA"], fasta ]
             },
             cycle2_target
                 .map { meta, row, fasta -> [ [meta.sample, meta.source], meta, row, fasta ] }
