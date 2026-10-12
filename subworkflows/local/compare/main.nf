@@ -2,9 +2,8 @@
  * The comparison table: the reference genome against the MAG each cycle recovered, one
  * row per genome.
  *
- * EukCC is taken as an input rather than run here, because assign_taxonomy.nf already
- * runs it on every genome in the experiment to assign the taxid - one EukCC run per
- * genome, whichever side of the comparison it is on (proposal.md section 5).
+ * EukCC is taken as an input rather than run here, because eukcc_assessment already
+ * runs it on every genome in the experiment to assign the taxid.
  */
 
 include { BUSCO                    } from '../../../modules/local/busco'

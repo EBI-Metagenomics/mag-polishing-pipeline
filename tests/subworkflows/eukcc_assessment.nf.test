@@ -1,8 +1,8 @@
 nextflow_workflow {
 
-    name "ASSIGN_TAXONOMY"
-    script "../../subworkflows/local/assign_taxonomy/main.nf"
-    workflow "ASSIGN_TAXONOMY"
+    name "EUKCC_ASSESSMENT"
+    script "../../subworkflows/local/eukcc_assessment/main.nf"
+    workflow "EUKCC_ASSESSMENT"
 
     // Every genome in the experiment - the reference and the MAGs of both cycles - goes
     // through here, so both sides of the comparison are classified by identical code.
@@ -17,7 +17,7 @@ nextflow_workflow {
                 """
                 input[0] = channel.of([
                     [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "reference", source: "reference"],
-                    file("\${projectDir}/tests/subworkflows/fixtures/assign_taxonomy/SAMPLE_001.fa")
+                    file("\${projectDir}/tests/subworkflows/fixtures/eukcc_assessment/SAMPLE_001.fa")
                 ])
                 """
             }
@@ -44,7 +44,7 @@ nextflow_workflow {
                 """
                 input[0] = channel.of([
                     [id: "SAMPLE_001", sample: "SAMPLE_001", origin: "cycle1", source: "cycle1"],
-                    file("\${projectDir}/tests/subworkflows/fixtures/assign_taxonomy/SAMPLE_001.fa")
+                    file("\${projectDir}/tests/subworkflows/fixtures/eukcc_assessment/SAMPLE_001.fa")
                 ])
                 """
             }

@@ -8,9 +8,9 @@ include { GUNZIP_GENOME as GUNZIP_REFERENCE     } from '../modules/local/gunzip_
 include { GUNZIP_GENOME as GUNZIP_CYCLE1        } from '../modules/local/gunzip_genome'
 include { GUNZIP_GENOME as GUNZIP_CYCLE2        } from '../modules/local/gunzip_genome'
 
-include { ASSIGN_TAXONOMY as TAXONOMY_REFERENCE } from '../subworkflows/local/assign_taxonomy'
-include { ASSIGN_TAXONOMY as TAXONOMY_CYCLE1    } from '../subworkflows/local/assign_taxonomy'
-include { ASSIGN_TAXONOMY as TAXONOMY_CYCLE2    } from '../subworkflows/local/assign_taxonomy'
+include { EUKCC_ASSESSMENT as EUKCC_REFERENCE   } from '../subworkflows/local/eukcc_assessment'
+include { EUKCC_ASSESSMENT as EUKCC_CYCLE1      } from '../subworkflows/local/eukcc_assessment'
+include { EUKCC_ASSESSMENT as EUKCC_CYCLE2      } from '../subworkflows/local/eukcc_assessment'
 
 include { ASSEMBLE_AND_BIN as CYCLE1            } from '../subworkflows/local/assemble_and_bin'
 include { ASSEMBLE_AND_BIN as CYCLE2            } from '../subworkflows/local/assemble_and_bin'
@@ -53,9 +53,9 @@ workflow MPP {
             [ [id: genome_name(genome), sample: meta.id, origin: "reference", source: "reference"], genome ]
         }
     )
-    TAXONOMY_REFERENCE( GUNZIP_REFERENCE.out.genome )
+    EUKCC_REFERENCE( GUNZIP_REFERENCE.out.genome )
 
-    eukaryotic_reference = TAXONOMY_REFERENCE.out.taxonomy.map { meta, row ->
+    eukaryotic_reference = EUKCC_REFERENCE.out.taxonomy.map { meta, row ->
         def lineage = row.ncbi_lng?.trim()
         if ( !lineage || lineage == "NA" || !lineage.tokenize('-').contains("2759") ) {
             error "Reference genome ${meta.id} (sample ${meta.sample}) is not eukaryotic: EukCC lineage '${lineage}'. This pipeline is eukaryote only, see proposal.md section 1."
@@ -63,7 +63,6 @@ workflow MPP {
         [ meta.sample ]
     }
 
-    // joined on the check above, so no MAG is ever aligned against a reference that failed it
     anchors = GUNZIP_REFERENCE.out.genome
         .map { meta, fasta -> [meta.sample, fasta] }
         .join( eukaryotic_reference )
@@ -71,12 +70,6 @@ workflow MPP {
     /*
      * Cycle 1 - the sample on its own, assembled and binned, and the MAG closest to the
      * reference is what Branchwater then searches with.
-     *
-     * --skip_first_assembly drops that whole cycle and searches with the reference genome
-     * from the samplesheet instead. The run is then reference + cycle 2 only: no cycle-1
-     * assembly, no cycle-1 GGP, no `cycle1` source in any table. Use it when the sample has
-     * already been assembled elsewhere, or when the question is only what the public runs
-     * add to a genome you already have.
      */
     if ( params.skip_first_assembly ) {
         cycle1_taxonomy = Channel.empty()
@@ -84,7 +77,6 @@ workflow MPP {
         cycle1_target   = Channel.empty()
         cycle1_versions = Channel.empty()
 
-        // the samplesheet genome as it is, not the GUNZIP copy: sourmash reads gzip natively
         branchwater_query = ch_samplesheet.map { meta, _reads, genome ->
             [ [id: genome_name(genome), sample: meta.id], genome ]
         }
@@ -99,24 +91,20 @@ workflow MPP {
         }
 
         GUNZIP_CYCLE1( cycle1_genomes )
-        TAXONOMY_CYCLE1( GUNZIP_CYCLE1.out.genome )
+        EUKCC_CYCLE1( GUNZIP_CYCLE1.out.genome )
 
         SKANI_CYCLE1( source_alignments( GUNZIP_CYCLE1.out.genome, anchors ) )
 
-        cycle1_taxonomy = TAXONOMY_CYCLE1.out.taxonomy
+        cycle1_taxonomy = EUKCC_CYCLE1.out.taxonomy
         cycle1_skani    = SKANI_CYCLE1.out.hits
         cycle1_target   = pick_target( cycle1_skani, cycle1_taxonomy, GUNZIP_CYCLE1.out.genome )
         cycle1_versions = CYCLE1.out.versions.mix( SKANI_CYCLE1.out.versions )
 
-        // the compressed bin, not the copy GUNZIP made: sourmash reads gzip natively
         branchwater_query = cycle1_target.map { meta, _row, _fasta -> [meta.id, meta] }
             .join( cycle1_genomes.map { meta, bin -> [meta.id, bin] } )
             .map { _id, meta, bin -> [meta, bin] }
     }
 
-    /*
-     * Branchwater -> ENA -> one co-assembly dataset per N.
-     */
     BUILD_CONCAT_DATASETS(
         branchwater_query,
         ch_samplesheet.map { meta, reads, _genome -> [meta.id, reads] }
@@ -147,17 +135,15 @@ workflow MPP {
             ]
         }
     )
-    TAXONOMY_CYCLE2( GUNZIP_CYCLE2.out.genome )
+    EUKCC_CYCLE2( GUNZIP_CYCLE2.out.genome )
 
     SKANI_CYCLE2( source_alignments( GUNZIP_CYCLE2.out.genome, anchors ) )
 
-    cycle2_target = pick_target( SKANI_CYCLE2.out.hits, TAXONOMY_CYCLE2.out.taxonomy, GUNZIP_CYCLE2.out.genome )
+    cycle2_target = pick_target( SKANI_CYCLE2.out.hits, EUKCC_CYCLE2.out.taxonomy, GUNZIP_CYCLE2.out.genome )
 
-    /*
-     * Tables.
-     */
-    all_taxonomy = TAXONOMY_REFERENCE.out.taxonomy
-        .mix( cycle1_taxonomy, TAXONOMY_CYCLE2.out.taxonomy )
+
+    all_taxonomy = EUKCC_REFERENCE.out.taxonomy
+        .mix( cycle1_taxonomy, EUKCC_CYCLE2.out.taxonomy )
 
     all_taxonomy
         .map { meta, row ->
@@ -170,7 +156,7 @@ workflow MPP {
             seed: "genome\tsample\torigin\ttaxid\tcompleteness\tcontamination\tncbi_lng\n"
         )
 
-    cycle1_taxonomy.mix( TAXONOMY_CYCLE2.out.taxonomy )
+    cycle1_taxonomy.mix( EUKCC_CYCLE2.out.taxonomy )
         .map { meta, row ->
             [meta.id, meta.sample, meta.origin, meta.source, row.taxid, row.completeness, row.contamination].join('\t') + '\n'
         }
@@ -204,9 +190,7 @@ workflow MPP {
 
     /*
      * One row per source that could be built: cycle 1 for every sample, plus the
-     * co-assembly datasets BUILD_CONCAT_DATASETS actually assembled - a sample whose
-     * only Branchwater hit is its own run has no cycle-2 source at all, and one with fewer
-     * usable hits than --n_concat_samples asks for has its depths capped (it warns).
+     * co-assembly datasets BUILD_CONCAT_DATASETS actually assembled.
      */
     cycle1_sources = params.skip_first_assembly
         ? Channel.empty()
@@ -232,12 +216,7 @@ workflow MPP {
             seed: "sample\tsource\tgenome\tani\taf_reference\ttaxid\tcompleteness\tcontamination\n"
         )
 
-    /*
-     * The comparison set: reference, cycle 1, one cycle 2 MAG per N - COMPARE orders them.
-     * Each target carries its skani numbers against the reference and, in cycle 2, the runs
-     * concatenated into its dataset: the sample plus the Branchwater hits. Cycle 1 assembles
-     * the samplesheet reads alone, so it has no concatenated runs; the reference has neither.
-     */
+    // The comparison set: reference, cycle 1, one cycle 2 MAG per N.
     concatenated_runs = BUILD_CONCAT_DATASETS.out.reads.map { meta, _reads ->
         [ [meta.sample, "n${meta.n_concat}".toString()], meta.sources.join(',') ]
     }
@@ -261,9 +240,6 @@ workflow MPP {
         all_taxonomy.map { meta, row -> [meta.id, row] }
     )
 
-    //
-    // Collate and save software versions
-    //
     ch_versions = ch_versions.mix(
         cycle1_versions,
         CYCLE2.out.versions,
@@ -387,7 +363,6 @@ def pick_target( skani_hits, taxonomy, genomes ) {
         .map { meta, tsv -> [ [meta.sample, meta.source], tsv.splitCsv(header: true, sep: '\t') ] }
         .join( taxonomy.map { meta, row -> [ [meta.sample, meta.source], [meta, row] ] }.groupTuple() )
         .flatMap { key, hits, candidates ->
-            // a genome EukCC gave up on has no taxonomy row, and so cannot be a target
             def by_id = candidates.collectEntries { meta, row -> [ (meta.id): [meta, row] ] }
             def ranked = hits.collect { hit ->
                 [ genome: genome_name(file(hit.Query_file)), ani: hit.ANI, af_reference: hit.Align_fraction_ref ]

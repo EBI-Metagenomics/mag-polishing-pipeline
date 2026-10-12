@@ -36,7 +36,7 @@ With `--skip_first_assembly`, `Cycle 1` is dropped: Branchwater is searched with
 
 ### Features
 
-**Reference check and taxonomy** (`subworkflows/local/assign_taxonomy`)
+**Reference check and taxonomy** (`subworkflows/local/eukcc_assessment`)
 
 - Runs EukCC on every genome in the analysis (the reference and every MAG from both cycles), so taxonomy, completeness, contamination and BUSCO metrics are generated for each genome of the target organism.
 - Fails fast when the reference genome does not descend from Eukaryota (NCBI taxid `2759`).
