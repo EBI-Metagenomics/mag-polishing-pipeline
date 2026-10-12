@@ -1,0 +1,44 @@
+nextflow_process {
+
+    name "CONCAT_FASTQ"
+    script "../../modules/local/concat_fastq/main.nf"
+    process "CONCAT_FASTQ"
+
+    // One co-assembly dataset: the sample's reads concatenated with the ENA runs. The
+    // provenance tsv is the only record of which accessions went into a dataset, and it
+    // is the one thing from this process that reaches results/.
+
+    def FIXTURES = "\${projectDir}/tests/subworkflows/fixtures/build_concat_datasets"
+
+    test("emits a paired dataset and its provenance, named after meta.id") {
+        options "-stub"
+        when {
+            process {
+                """
+                input[0] = [
+                    [
+                        id: "SAMPLE_001_n5",
+                        sample: "SAMPLE_001",
+                        n_concat: 5,
+                        sources: ["SAMPLE_001", "SRR1", "SRR2", "SRR3", "SRR4", "SRR5"]
+                    ],
+                    [ file("${FIXTURES}/SAMPLE_001_1.fastq.gz") ],
+                    [ file("${FIXTURES}/SAMPLE_001_2.fastq.gz") ]
+                ]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def (meta, reads) = process.out.reads[0]
+            assert meta.id == "SAMPLE_001_n5"
+            assert reads.size() == 2
+            assert reads[0].endsWith("SAMPLE_001_n5_1.fastq.gz")
+            assert reads[1].endsWith("SAMPLE_001_n5_2.fastq.gz")
+
+            def provenance = path(process.out.provenance[0][1]).text
+            assert provenance.startsWith("dataset\tn_concat_samples\tsource")
+            assert provenance.contains("SAMPLE_001_n5\t5")
+        }
+    }
+}

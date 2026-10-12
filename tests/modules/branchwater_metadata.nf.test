@@ -1,0 +1,34 @@
+nextflow_process {
+
+    name "BRANCHWATER_METADATA"
+    script "../../modules/local/branchwater_metadata/main.nf"
+    process "BRANCHWATER_METADATA"
+
+    // Joins the manysearch hits with the Branchwater metadata DuckDB.
+    //
+    // The container is declared per engine on purpose - the `oras://` tag is a SIF that
+    // only Singularity/Apptainer can run - but nf-test cannot introspect a process's
+    // resolved container, so that part is NOT covered here. It was verified by running
+    // the module for real under -profile docker; see docs/usage.md.
+
+    def FIXTURES = "\${projectDir}/tests/subworkflows/fixtures/build_concat_datasets"
+
+    test("emits the joined csv named after meta.id") {
+        options "-stub"
+        when {
+            process {
+                """
+                input[0] = [ [id: "SAMPLE_001"], file("${FIXTURES}/SAMPLE_001_concoct_1.fa") ]
+                input[1] = file("\${projectDir}/nextflow.config")
+                """
+            }
+        }
+        then {
+            assert process.success
+            def (meta, csv) = process.out.metadata[0]
+            assert meta.id == "SAMPLE_001"
+            assert csv.endsWith("SAMPLE_001_hits_metadata.csv")
+            assert process.out.versions.size() == 1
+        }
+    }
+}

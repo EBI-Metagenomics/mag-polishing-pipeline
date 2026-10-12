@@ -1,0 +1,42 @@
+nextflow_function {
+
+    name "concat_depths"
+    script "../../subworkflows/local/build_concat_datasets/main.nf"
+    function "concat_depths"
+
+    test("every requested depth fits") {
+        when { function { """ input[0] = [1, 5, 10]; input[1] = 10 """ } }
+        then { assert function.success; assert function.result == [1, 5, 10] }
+    }
+
+    test("spare hits change nothing") {
+        when { function { """ input[0] = [1, 5, 10]; input[1] = 12 """ } }
+        then { assert function.result == [1, 5, 10] }
+    }
+
+    test("the deepest request is capped at what Branchwater delivered") {
+        when { function { """ input[0] = [1, 5, 10]; input[1] = 7 """ } }
+        then { assert function.result == [1, 5, 7] }
+    }
+
+    test("depths that would be identical collapse into one") {
+        // 3 usable hits and 1,5,10 requested: n5 and n10 would both be n3
+        when { function { """ input[0] = [1, 5, 10]; input[1] = 3 """ } }
+        then { assert function.result == [1, 3] }
+    }
+
+    test("a single usable hit is still n1") {
+        when { function { """ input[0] = [1, 5, 10]; input[1] = 1 """ } }
+        then { assert function.result == [1] }
+    }
+
+    test("no usable hit means no co-assembly at all") {
+        when { function { """ input[0] = [1, 5, 10]; input[1] = 0 """ } }
+        then { assert function.result == [] }
+    }
+
+    test("a single requested depth is capped too") {
+        when { function { """ input[0] = [5]; input[1] = 2 """ } }
+        then { assert function.result == [2] }
+    }
+}

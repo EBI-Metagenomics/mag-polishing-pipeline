@@ -1,0 +1,40 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/EBI-Metagenomics/mag-polishing-pipeline/main/assets/schema_input.json",
+    "title": "EBI-Metagenomics/mag-polishing-pipeline pipeline - params.input schema",
+    "description": "Schema for the file provided with params.input",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^\\S{7,}$",
+                "errorMessage": "Sample name must be at least 7 characters and cannot contain spaces. miassembler substrings it to 7 characters to build its publish paths, so anything shorter aborts the run.",
+                "meta": ["id"]
+            },
+            "fastq_1": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
+                "errorMessage": "FastQ file for reads 1 must be provided, cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'"
+            },
+            "fastq_2": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.f(ast)?q\\.gz$",
+                "errorMessage": "FastQ file for reads 2 must be provided, cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'. This pipeline is paired-end only."
+            },
+            "genome": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.(fa|fna|fasta)(\\.gz)?$",
+                "errorMessage": "The eukaryotic reference genome for this sample must be provided and must have extension '.fa', '.fna' or '.fasta', optionally gzipped."
+            }
+        },
+        "required": ["sample", "fastq_1", "fastq_2", "genome"]
+    }
+}

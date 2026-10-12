@@ -1,0 +1,8 @@
+[submodule "pipelines/miassembler"]
+	path = pipelines/miassembler
+	url = https://github.com/EBI-Metagenomics/miassembler.git
+	branch = v3.1.16
+[submodule "pipelines/genomes-generation"]
+	path = pipelines/genomes-generation
+	url = https://github.com/EBI-Metagenomics/genomes-generation.git
+	branch = v1.3.3

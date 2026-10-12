@@ -1,0 +1,2 @@
+sample,fastq_1,fastq_2,genome
+SAMPLE_001,tests/fixtures/SAMPLE_001_1.fastq.gz,tests/fixtures/SAMPLE_001_2.fastq.gz,tests/fixtures/SAMPLE_001.fna.gz
